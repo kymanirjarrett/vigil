@@ -1,6 +1,7 @@
 import { useState } from "react";
 import JobsTable from "./components/JobsTable";
 import JobRunsPanel from "./components/JobRunsPanel";
+import AnomalyBanner from "./components/AnomalyBanner";
 import "./App.css";
 
 export default function App() {
@@ -30,6 +31,8 @@ export default function App() {
           <h1>Glue Job Monitor</h1>
           <p>Select a job to inspect its run history</p>
         </div>
+
+        <AnomalyBanner />
 
         <JobsTable onSelectJob={setSelectedJob} selectedJob={selectedJob} />
 

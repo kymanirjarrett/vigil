@@ -1,0 +1,128 @@
+from fastapi import APIRouter, HTTPException
+from aws_client import get_glue_client
+from botocore.exceptions import ClientError
+import statistics
+
+router = APIRouter()
+
+
+def detect_anomalies(runs: list) -> list:
+    """
+    Analyze a list of job runs and flag anomalies.
+    Two detection rules:
+      1. Duration spike — run time is > 2 standard deviations above the mean
+      2. Consecutive failures — 2 or more FAILED runs in a row
+    """
+    anomalies = []
+
+    # ── Rule 1: Duration spike ──────────────────────────────────────────────
+    completed = [
+        r for r in runs
+        if r.get("execution_time") and r["status"] in ("SUCCEEDED", "FAILED")
+    ]
+
+    if len(completed) >= 3:
+        times = [r["execution_time"] for r in completed]
+        mean  = statistics.mean(times)
+        stdev = statistics.stdev(times)
+        threshold = mean + (2 * stdev)
+
+        for run in completed:
+            if run["execution_time"] > threshold and stdev > 0:
+                anomalies.append({
+                    "run_id":    run["run_id"],
+                    "type":      "DURATION_SPIKE",
+                    "severity":  "warning",
+                    "message":   (
+                        f"Run took {run['execution_time']}s — "
+                        f"{round((run['execution_time'] - mean) / stdev, 1)}σ above average "
+                        f"({round(mean)}s)"
+                    ),
+                    "started_on": run["started_on"],
+                })
+
+    # ── Rule 2: Consecutive failures ────────────────────────────────────────
+    streak = 0
+    for run in runs:  # runs are newest-first from the API
+        if run["status"] == "FAILED":
+            streak += 1
+            if streak >= 2:
+                anomalies.append({
+                    "run_id":    run["run_id"],
+                    "type":      "CONSECUTIVE_FAILURES",
+                    "severity":  "critical",
+                    "message":   f"{streak} consecutive failed runs detected.",
+                    "started_on": run["started_on"],
+                })
+                break
+        else:
+            streak = 0
+
+    return anomalies
+
+
+@router.get("/jobs/{job_name}/anomalies")
+def get_job_anomalies(job_name: str):
+    """Return anomaly analysis for a specific Glue job."""
+    client = get_glue_client()
+    try:
+        response = client.get_job_runs(JobName=job_name, MaxResults=50)
+        runs = [
+            {
+                "run_id":         run["Id"],
+                "status":         run["JobRunState"],
+                "started_on":     str(run.get("StartedOn", "")),
+                "execution_time": run.get("ExecutionTime", 0),
+                "error_message":  run.get("ErrorMessage", None),
+            }
+            for run in response.get("JobRuns", [])
+        ]
+
+        anomalies = detect_anomalies(runs)
+
+        return {
+            "job_name":       job_name,
+            "runs_analyzed":  len(runs),
+            "anomaly_count":  len(anomalies),
+            "anomalies":      anomalies,
+        }
+
+    except ClientError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/summary")
+def get_all_anomalies():
+    """Scan all Glue jobs and return a combined anomaly summary."""
+    client = get_glue_client()
+    try:
+        jobs_response = client.get_jobs()
+        jobs = jobs_response.get("Jobs", [])
+
+        all_anomalies = []
+        for job in jobs:
+            job_name = job["Name"]
+            runs_response = client.get_job_runs(JobName=job_name, MaxResults=50)
+            runs = [
+                {
+                    "run_id":         r["Id"],
+                    "status":         r["JobRunState"],
+                    "started_on":     str(r.get("StartedOn", "")),
+                    "execution_time": r.get("ExecutionTime", 0),
+                    "error_message":  r.get("ErrorMessage", None),
+                }
+                for r in runs_response.get("JobRuns", [])
+            ]
+            detected = detect_anomalies(runs)
+            for a in detected:
+                a["job_name"] = job_name
+            all_anomalies.extend(detected)
+
+        return {
+            "jobs_scanned":  len(jobs),
+            "anomaly_count": len(all_anomalies),
+            "anomalies":     all_anomalies,
+        }
+
+    except ClientError as e:
+        raise HTTPException(status_code=500, detail=str(e))
