@@ -2,6 +2,7 @@ import { useState } from "react";
 import JobsTable from "./components/JobsTable";
 import JobRunsPanel from "./components/JobRunsPanel";
 import AnomalyBanner from "./components/AnomalyBanner";
+import AlertsPanel from "./components/AlertsPanel";
 import "./App.css";
 
 export default function App() {
@@ -33,11 +34,13 @@ export default function App() {
         </div>
 
         <AnomalyBanner />
-
         <JobsTable onSelectJob={setSelectedJob} selectedJob={selectedJob} />
 
         {selectedJob && (
-          <JobRunsPanel jobName={selectedJob} onClose={() => setSelectedJob(null)} />
+          <>
+            <JobRunsPanel jobName={selectedJob} onClose={() => setSelectedJob(null)} />
+            <AlertsPanel jobName={selectedJob} />
+          </>
         )}
       </main>
     </div>

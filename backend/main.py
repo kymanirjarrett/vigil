@@ -1,11 +1,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import glue, anomalies
+from routers import glue, anomalies, alerts
 
 app = FastAPI(
     title="Vigil API",
     description="ETL Monitoring & Observability Platform",
-    version="0.2.0"
+    version="0.3.0"
 )
 
 app.add_middleware(
@@ -18,7 +18,8 @@ app.add_middleware(
 
 app.include_router(glue.router,      prefix="/api/glue",      tags=["Glue"])
 app.include_router(anomalies.router, prefix="/api/anomalies", tags=["Anomalies"])
+app.include_router(alerts.router,    prefix="/api/alerts",    tags=["Alerts"])
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "service": "Vigil API", "version": "0.2.0"}
+    return {"status": "ok", "service": "Vigil API", "version": "0.3.0"}
