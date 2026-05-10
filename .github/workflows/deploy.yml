@@ -1,0 +1,16 @@
+name: Notify GitHub of Render Deployment
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create GitHub Deployment
+        uses: chrnorm/deployment-action@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          environment: production
+          description: "Deployed to Render"
