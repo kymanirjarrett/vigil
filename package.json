@@ -3,20 +3,26 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "setup":          "bash scripts/setup.sh",
-    "dev:backend":    "bash scripts/dev-backend.sh",
-    "dev:frontend":   "cd frontend && npm run dev",
+    "setup": "bash scripts/setup.sh",
+    "dev:backend": "bash scripts/dev-backend.sh",
+    "dev:frontend": "cd frontend && npm run dev",
     "reveal-secrets": "bash scripts/reveal-secrets.sh",
-    "lint":           "cd frontend && npm run lint",
-    "lint:fix":       "cd frontend && npm run lint -- --fix",
-    "prepare":        "husky"
+    "lint": "cd frontend && npm run lint",
+    "lint:fix": "cd frontend && npm run lint -- --fix",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "@secretlint/secretlint-rule-preset-recommend": "^13.0.0",
     "husky": "^9.0.0",
-    "lint-staged": "^15.0.0"
+    "lint-staged": "^15.0.0",
+    "secretlint": "^13.0.0"
   },
   "lint-staged": {
-    "frontend/src/**/*.{js,jsx}": ["./frontend/node_modules/.bin/eslint --max-warnings=0"],
-    "backend/**/*.py": ["python3 -m py_compile"]
+    "frontend/src/**/*.{js,jsx}": [
+      "./frontend/node_modules/.bin/eslint --max-warnings=0"
+    ],
+    "backend/**/*.py": [
+      "python3 -m py_compile"
+    ]
   }
 }
