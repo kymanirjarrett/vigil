@@ -4,9 +4,10 @@ import axios from "axios";
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 export default function JobsTable({ onSelectJob, selectedJob }) {
-  const [jobs, setJobs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [jobs, setJobs]         = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(null);
+  const [slowStart, setSlowStart] = useState(false);
 
   const loadJobs = async () => {
     try {
@@ -33,20 +34,21 @@ export default function JobsTable({ onSelectJob, selectedJob }) {
 
   useEffect(() => {
     let cancelled = false;
+    const slowTimer = setTimeout(() => {
+      if (!cancelled) setSlowStart(true);
+    }, 3000);
 
     const run = async () => {
       try {
         const jobsData = await loadJobs();
-        if (!cancelled) {
-          setJobs(jobsData);
-        }
+        if (!cancelled) setJobs(jobsData);
       } catch {
-        if (!cancelled) {
-          setError("Failed to load jobs. Is the backend running?");
-        }
+        if (!cancelled) setError("Failed to load jobs. Is the backend running?");
       } finally {
+        clearTimeout(slowTimer);
         if (!cancelled) {
           setLoading(false);
+          setSlowStart(false);
         }
       }
     };
@@ -55,6 +57,7 @@ export default function JobsTable({ onSelectJob, selectedJob }) {
 
     return () => {
       cancelled = true;
+      clearTimeout(slowTimer);
     };
   }, []);
 
@@ -68,7 +71,13 @@ export default function JobsTable({ onSelectJob, selectedJob }) {
       </div>
 
       <div className="table-wrap">
-        {loading && <div className="state-msg">Loading jobs...</div>}
+        {loading && (
+          <div className="state-msg">
+            {slowStart
+              ? "Waking up the server — this can take up to 30s on first load..."
+              : "Loading jobs..."}
+          </div>
+        )}
         {error && (
           <div className="state-msg" style={{ color: "var(--danger)" }}>
             {error}
