@@ -16,7 +16,7 @@
     "lint-staged": "^15.0.0"
   },
   "lint-staged": {
-    "frontend/src/**/*.{js,jsx}": ["eslint --max-warnings=0"],
+    "frontend/src/**/*.{js,jsx}": ["./frontend/node_modules/.bin/eslint --max-warnings=0"],
     "backend/**/*.py": ["python3 -m py_compile"]
   }
 }
