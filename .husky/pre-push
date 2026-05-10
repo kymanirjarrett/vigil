@@ -1,0 +1,11 @@
+echo "Linting frontend..."
+(cd frontend && npm run lint)
+
+echo "Linting backend..."
+if [ -f backend/venv/bin/ruff ]; then
+  backend/venv/bin/ruff check backend/ --exclude backend/venv
+else
+  echo "Warning: ruff not found in backend/venv, skipping backend lint"
+fi
+
+echo "All checks passed."
