@@ -84,7 +84,7 @@ body {
 }
 
 /* ── Main ── */
-.main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
+.main { padding: 2rem; max-width: 1440px; margin: 0 auto; width: 100%; }
 
 .page-title { margin-bottom: 1.75rem; }
 .page-title h1 {
