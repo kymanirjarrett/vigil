@@ -1,8 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
+from sqlalchemy.orm import Session
 from aws_client import get_glue_client
 from botocore.exceptions import ClientError
 from routers.anomalies import detect_anomalies
+from database import get_db
+from models import AlertLog
 import sendgrid
 from sendgrid.helpers.mail import Mail
 import os
@@ -107,7 +110,7 @@ def send_alert_email(recipient: str, job_name: str, anomalies: list):
 
 
 @router.post("/trigger")
-def trigger_alert(req: AlertRequest):
+def trigger_alert(req: AlertRequest, db: Session = Depends(get_db)):
     """Scan a job for anomalies and send an alert email if any are found."""
     client = get_glue_client()
     try:
@@ -133,6 +136,15 @@ def trigger_alert(req: AlertRequest):
             }
 
         status_code = send_alert_email(req.recipient_email, req.job_name, anomalies)
+
+        log_entry = AlertLog(
+            recipient       = req.recipient_email,
+            job_name        = req.job_name,
+            anomaly_count   = len(anomalies),
+            sendgrid_status = status_code,
+        )
+        db.add(log_entry)
+        db.commit()
 
         return {
             "sent":            True,

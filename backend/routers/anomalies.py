@@ -1,6 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from aws_client import get_glue_client
 from botocore.exceptions import ClientError
+from database import get_db
+from models import AnomalyEvent
 import statistics
 
 router = APIRouter()
@@ -92,8 +96,8 @@ def get_job_anomalies(job_name: str):
 
 
 @router.get("/summary")
-def get_all_anomalies():
-    """Scan all Glue jobs and return a combined anomaly summary."""
+def get_all_anomalies(db: Session = Depends(get_db)):
+    """Scan all Glue jobs and return a combined anomaly summary. Persists new anomalies to DB."""
     client = get_glue_client()
     try:
         jobs_response = client.get_jobs()
@@ -117,6 +121,21 @@ def get_all_anomalies():
             for a in detected:
                 a["job_name"] = job_name
             all_anomalies.extend(detected)
+
+        # Persist each anomaly; the UNIQUE(run_id, type) constraint silently skips duplicates
+        for a in all_anomalies:
+            record = AnomalyEvent(
+                job_name = a["job_name"],
+                run_id   = a["run_id"],
+                type     = a["type"],
+                severity = a["severity"],
+                message  = a["message"],
+            )
+            db.add(record)
+            try:
+                db.commit()
+            except IntegrityError:
+                db.rollback()
 
         return {
             "jobs_scanned":  len(jobs),

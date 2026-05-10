@@ -3,6 +3,7 @@ import JobsTable from "./components/JobsTable";
 import JobRunsPanel from "./components/JobRunsPanel";
 import AnomalyBanner from "./components/AnomalyBanner";
 import AlertsPanel from "./components/AlertsPanel";
+import HistoryPanel from "./components/HistoryPanel";
 import "./App.css";
 
 export default function App() {
@@ -42,6 +43,8 @@ export default function App() {
             <AlertsPanel jobName={selectedJob} />
           </>
         )}
+
+        <HistoryPanel />
       </main>
     </div>
   );
