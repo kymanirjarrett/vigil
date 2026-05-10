@@ -1,4 +1,4 @@
-STAGED=$(git diff --cached --name-only)
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
 if [ -n "$STAGED" ]; then
   echo "Scanning staged files for secrets..."
   echo "$STAGED" | xargs npx secretlint --secretlintrc .secretlintrc.json
