@@ -5,7 +5,8 @@ from aws_client import get_glue_client
 from botocore.exceptions import ClientError
 from routers.anomalies import detect_anomalies
 from database import get_db
-from models import AlertLog
+from models import AlertLog, User
+from permissions import require_permission
 import sendgrid
 from sendgrid.helpers.mail import Mail
 import os
@@ -110,7 +111,11 @@ def send_alert_email(recipient: str, job_name: str, anomalies: list):
 
 
 @router.post("/trigger")
-def trigger_alert(req: AlertRequest, db: Session = Depends(get_db)):
+def trigger_alert(
+    req: AlertRequest,
+    _: User = Depends(require_permission("alerts:trigger")),
+    db: Session = Depends(get_db),
+):
     """Scan a job for anomalies and send an alert email if any are found."""
     client = get_glue_client()
     try:

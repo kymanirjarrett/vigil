@@ -13,6 +13,7 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     role          = Column(String, nullable=False, default="analyst")
     is_active     = Column(Boolean, nullable=False, default=True)
+    demo_mode     = Column(Boolean, nullable=False, default=False)
     created_at    = Column(DateTime(timezone=True), server_default=func.now())
     last_login_at = Column(DateTime(timezone=True), nullable=True)
 

@@ -4,10 +4,16 @@ from sqlalchemy.exc import IntegrityError
 from aws_client import get_glue_client
 from botocore.exceptions import ClientError
 from database import get_db
-from models import AnomalyEvent
+from models import AnomalyEvent, User
+from routers.auth import get_current_user
+from demo_data import get_demo_jobs, get_demo_runs
 import statistics
 
 router = APIRouter()
+
+
+def _use_demo(user: User) -> bool:
+    return user.role == "analyst" or user.demo_mode
 
 
 def detect_anomalies(runs: list) -> list:
@@ -19,7 +25,6 @@ def detect_anomalies(runs: list) -> list:
     """
     anomalies = []
 
-    # ── Rule 1: Duration spike ──────────────────────────────────────────────
     completed = [
         r for r in runs
         if r.get("execution_time") and r["status"] in ("SUCCEEDED", "FAILED")
@@ -45,9 +50,8 @@ def detect_anomalies(runs: list) -> list:
                     "started_on": run["started_on"],
                 })
 
-    # ── Rule 2: Consecutive failures ────────────────────────────────────────
     streak = 0
-    for run in runs:  # runs are newest-first from the API
+    for run in runs:
         if run["status"] == "FAILED":
             streak += 1
             if streak >= 2:
@@ -66,8 +70,23 @@ def detect_anomalies(runs: list) -> list:
 
 
 @router.get("/jobs/{job_name}/anomalies")
-def get_job_anomalies(job_name: str):
-    """Return anomaly analysis for a specific Glue job."""
+def get_job_anomalies(
+    job_name: str,
+    current_user: User = Depends(get_current_user),
+):
+    if _use_demo(current_user):
+        runs = get_demo_runs(job_name)
+        anomalies = detect_anomalies(runs)
+        for a in anomalies:
+            a["job_name"] = job_name
+        return {
+            "job_name": job_name,
+            "runs_analyzed": len(runs),
+            "anomaly_count": len(anomalies),
+            "anomalies": anomalies,
+            "source": "demo",
+        }
+
     client = get_glue_client()
     try:
         response = client.get_job_runs(JobName=job_name, MaxResults=50)
@@ -81,23 +100,39 @@ def get_job_anomalies(job_name: str):
             }
             for run in response.get("JobRuns", [])
         ]
-
         anomalies = detect_anomalies(runs)
-
         return {
-            "job_name":       job_name,
-            "runs_analyzed":  len(runs),
-            "anomaly_count":  len(anomalies),
-            "anomalies":      anomalies,
+            "job_name": job_name,
+            "runs_analyzed": len(runs),
+            "anomaly_count": len(anomalies),
+            "anomalies": anomalies,
+            "source": "live",
         }
-
     except ClientError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/summary")
-def get_all_anomalies(db: Session = Depends(get_db)):
-    """Scan all Glue jobs and return a combined anomaly summary. Persists new anomalies to DB."""
+def get_all_anomalies(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if _use_demo(current_user):
+        all_anomalies = []
+        for job in get_demo_jobs():
+            job_name = job["name"]
+            runs = get_demo_runs(job_name)
+            detected = detect_anomalies(runs)
+            for a in detected:
+                a["job_name"] = job_name
+            all_anomalies.extend(detected)
+        return {
+            "jobs_scanned": len(get_demo_jobs()),
+            "anomaly_count": len(all_anomalies),
+            "anomalies": all_anomalies,
+            "source": "demo",
+        }
+
     client = get_glue_client()
     try:
         jobs_response = client.get_jobs()
@@ -122,14 +157,13 @@ def get_all_anomalies(db: Session = Depends(get_db)):
                 a["job_name"] = job_name
             all_anomalies.extend(detected)
 
-        # Persist each anomaly; the UNIQUE(run_id, type) constraint silently skips duplicates
         for a in all_anomalies:
             record = AnomalyEvent(
-                job_name = a["job_name"],
-                run_id   = a["run_id"],
-                type     = a["type"],
-                severity = a["severity"],
-                message  = a["message"],
+                job_name=a["job_name"],
+                run_id=a["run_id"],
+                type=a["type"],
+                severity=a["severity"],
+                message=a["message"],
             )
             db.add(record)
             try:
@@ -138,10 +172,10 @@ def get_all_anomalies(db: Session = Depends(get_db)):
                 db.rollback()
 
         return {
-            "jobs_scanned":  len(jobs),
+            "jobs_scanned": len(jobs),
             "anomaly_count": len(all_anomalies),
-            "anomalies":     all_anomalies,
+            "anomalies": all_anomalies,
+            "source": "live",
         }
-
     except ClientError as e:
         raise HTTPException(status_code=500, detail=str(e))
