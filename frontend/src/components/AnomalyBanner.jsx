@@ -30,7 +30,7 @@ export default function AnomalyBanner() {
 
   const loadAnomalies = async () => {
     try {
-      const res = await axios.get(`${API}/api/anomalies/summary`);
+      const res = await axios.get(`${API}/api/v1/anomalies/summary`);
       return res.data;
     } catch (e) {
       console.error("Anomaly fetch failed", e);

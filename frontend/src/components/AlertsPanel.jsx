@@ -13,7 +13,7 @@ export default function AlertsPanel({ jobName }) {
     setStatus("sending");
     setMessage("");
     try {
-      const res = await axios.post(`${API}/api/alerts/trigger`, {
+      const res = await axios.post(`${API}/api/v1/alerts/trigger`, {
         job_name:        jobName,
         recipient_email: email,
       });

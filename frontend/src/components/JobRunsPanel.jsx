@@ -69,7 +69,7 @@ export default function JobRunsPanel({ jobName, onClose }) {
       setLoading(true);
       setError(null);
       try {
-        const res = await axios.get(`${API}/api/glue/jobs/${jobName}/runs`);
+        const res = await axios.get(`${API}/api/v1/glue/jobs/${jobName}/runs`);
         setRuns(res.data.runs);
       } catch {
         setError("Could not load run history.");
