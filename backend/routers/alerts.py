@@ -7,6 +7,7 @@ from routers.anomalies import detect_anomalies
 from database import get_db
 from models import AlertLog, User
 from permissions import require_permission
+from demo_data import get_demo_runs
 import sendgrid
 from sendgrid.helpers.mail import Mail
 import os
@@ -113,31 +114,36 @@ def send_alert_email(recipient: str, job_name: str, anomalies: list):
 @router.post("/trigger")
 def trigger_alert(
     req: AlertRequest,
-    _: User = Depends(require_permission("alerts:trigger")),
+    current_user: User = Depends(require_permission("alerts:trigger")),
     db: Session = Depends(get_db),
 ):
     """Scan a job for anomalies and send an alert email if any are found."""
-    client = get_glue_client()
+    use_demo = current_user.role == "analyst" or current_user.demo_mode
+
     try:
-        response = client.get_job_runs(JobName=req.job_name, MaxResults=50)
-        runs = [
-            {
-                "run_id":         r["Id"],
-                "status":         r["JobRunState"],
-                "started_on":     str(r.get("StartedOn", "")),
-                "execution_time": r.get("ExecutionTime", 0),
-                "error_message":  r.get("ErrorMessage", None),
-            }
-            for r in response.get("JobRuns", [])
-        ]
+        if use_demo:
+            runs = get_demo_runs(req.job_name)
+        else:
+            client = get_glue_client()
+            response = client.get_job_runs(JobName=req.job_name, MaxResults=50)
+            runs = [
+                {
+                    "run_id":         r["Id"],
+                    "status":         r["JobRunState"],
+                    "started_on":     str(r.get("StartedOn", "")),
+                    "execution_time": r.get("ExecutionTime", 0),
+                    "error_message":  r.get("ErrorMessage", None),
+                }
+                for r in response.get("JobRuns", [])
+            ]
 
         anomalies = detect_anomalies(runs)
 
         if not anomalies:
             return {
-                "sent":    False,
-                "reason":  "No anomalies detected — no alert sent.",
-                "job":     req.job_name,
+                "sent":   False,
+                "reason": "No anomalies detected — no alert sent.",
+                "job":    req.job_name,
             }
 
         status_code = send_alert_email(req.recipient_email, req.job_name, anomalies)

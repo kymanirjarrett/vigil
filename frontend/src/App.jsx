@@ -22,6 +22,7 @@ if (_stored) axios.defaults.headers.common["Authorization"] = `Bearer ${_stored}
 function Dashboard({ onLogout, user, onUserUpdate }) {
   const [selectedJob, setSelectedJob] = useState(null);
   const [toggling, setToggling]       = useState(false);
+  const [modeKey, setModeKey]         = useState(0);
 
   const isDemo = user?.role === "analyst" || user?.demo_mode;
   const canToggle = user?.role === "admin";
@@ -31,6 +32,9 @@ function Dashboard({ onLogout, user, onUserUpdate }) {
     try {
       const res = await axios.post(`${API}/api/v1/mode/toggle`);
       onUserUpdate({ ...user, demo_mode: res.data.demo_mode });
+      // Clear selection and force all data panels to remount + refetch
+      setSelectedJob(null);
+      setModeKey(k => k + 1);
     } catch (e) {
       console.error("Mode toggle failed", e);
     } finally {
@@ -119,8 +123,8 @@ function Dashboard({ onLogout, user, onUserUpdate }) {
           </p>
         </div>
 
-        <AnomalyBanner />
-        <JobsTable onSelectJob={setSelectedJob} selectedJob={selectedJob} />
+        <AnomalyBanner key={`anomaly-${modeKey}`} />
+        <JobsTable key={`jobs-${modeKey}`} onSelectJob={setSelectedJob} selectedJob={selectedJob} />
 
         {selectedJob && (
           <>
