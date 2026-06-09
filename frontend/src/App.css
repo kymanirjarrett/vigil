@@ -291,7 +291,7 @@ tbody tr.selected td { color: var(--accent); }
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 5vw;
+  padding: 0 4rem;
   height: 64px;
   border-bottom: 1px solid var(--border);
   background: var(--bg);
@@ -380,7 +380,7 @@ tbody tr.selected td { color: var(--accent); }
   gap: 4rem;
   align-items: center;
   width: 100%;
-  padding: 5rem 5vw;
+  padding: 5rem 4rem;
 }
 
 .landing-hero-inner { display: flex; flex-direction: column; gap: 1.5rem; }
@@ -510,7 +510,7 @@ tbody tr.selected td { color: var(--accent); }
 /* ── Features ── */
 .landing-features {
   width: 100%;
-  padding: 5rem 5vw;
+  padding: 5rem 4rem;
   border-top: 1px solid var(--border);
 }
 
@@ -570,7 +570,7 @@ tbody tr.selected td { color: var(--accent); }
 /* ── How it works ── */
 .landing-how {
   width: 100%;
-  padding: 5rem 5vw;
+  padding: 5rem 4rem;
   border-top: 1px solid var(--border);
 }
 
@@ -638,7 +638,7 @@ tbody tr.selected td { color: var(--accent); }
 /* ── Footer ── */
 .landing-footer {
   width: 100%;
-  padding: 3rem 5vw;
+  padding: 3rem 4rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -685,7 +685,7 @@ tbody tr.selected td { color: var(--accent); }
 @media (max-width: 900px) {
   .landing-hero {
     grid-template-columns: 1fr;
-    padding: 4rem 5vw;
+    padding: 4rem 2rem;
   }
 
   .landing-terminal { display: none; }
