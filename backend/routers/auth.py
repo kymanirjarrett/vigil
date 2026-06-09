@@ -1,17 +1,24 @@
+import os
+import uuid as uuid_lib
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from datetime import datetime, timedelta, timezone
-import os
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from database import get_db
+from models import User
 
 router = APIRouter()
 
-ALGORITHM              = "HS256"
+ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_HOURS = 8
 
-pwd_context   = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
 def _secret_key() -> str:
@@ -21,13 +28,23 @@ def _secret_key() -> str:
     return key
 
 
-def create_access_token(username: str) -> str:
+def _normalize_email(email: str) -> str:
+    return email.strip().lower()
+
+
+def create_access_token(user: User) -> str:
     expire = datetime.now(timezone.utc) + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
-    return jwt.encode({"sub": username, "exp": expire}, _secret_key(), algorithm=ALGORITHM)
+    return jwt.encode(
+        {"sub": str(user.id), "email": user.email, "role": user.role, "exp": expire},
+        _secret_key(),
+        algorithm=ALGORITHM,
+    )
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
-    """FastAPI dependency — validates Bearer token and returns the username."""
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> User:
     credentials_exc = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Invalid or expired token",
@@ -35,32 +52,82 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
     )
     try:
         payload = jwt.decode(token, _secret_key(), algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if not username:
+        user_id_str: str = payload.get("sub")
+        if not user_id_str:
             raise credentials_exc
-        return username
-    except JWTError:
+        user_id = uuid_lib.UUID(user_id_str)
+    except (JWTError, ValueError):
         raise credentials_exc
+
+    user = db.query(User).filter(User.id == user_id, User.is_active).first()
+    if not user:
+        raise credentials_exc
+    return user
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+
+
+@router.post("/signup", status_code=201)
+def signup(req: SignupRequest, db: Session = Depends(get_db)):
+    if len(req.password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+
+    email = _normalize_email(req.email)
+    existing = db.query(User).filter(User.email == email).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Email already registered")
+
+    user = User(
+        email=email,
+        password_hash=pwd_context.hash(req.password),
+        role="analyst",
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "access_token": create_access_token(user),
+        "token_type": "bearer",
+        "user": {"id": str(user.id), "email": user.email, "role": user.role},
+    }
 
 
 @router.post("/login")
-def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    """Validate credentials and return a JWT access token."""
-    expected_username = os.getenv("VIGIL_USERNAME")
-    expected_hash     = os.getenv("VIGIL_PASSWORD_HASH")
-
-    if not expected_username or not expected_hash:
-        raise HTTPException(status_code=500, detail="Auth credentials not configured in .env")
-
-    if form_data.username != expected_username or \
-       not pwd_context.verify(form_data.password, expected_hash):
+def login(req: LoginRequest, db: Session = Depends(get_db)):
+    email = _normalize_email(req.email)
+    user = db.query(User).filter(User.email == email, User.is_active).first()
+    if not user or not pwd_context.verify(req.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
+            detail="Invalid email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    user.last_login_at = datetime.now(timezone.utc)
+    db.commit()
+
     return {
-        "access_token": create_access_token(form_data.username),
-        "token_type":   "bearer",
+        "access_token": create_access_token(user),
+        "token_type": "bearer",
+        "user": {"id": str(user.id), "email": user.email, "role": user.role},
+    }
+
+
+@router.get("/me")
+def me(current_user: User = Depends(get_current_user)):
+    return {
+        "id": str(current_user.id),
+        "email": current_user.email,
+        "role": current_user.role,
+        "created_at": current_user.created_at.isoformat() if current_user.created_at else None,
+        "last_login_at": current_user.last_login_at.isoformat() if current_user.last_login_at else None,
     }

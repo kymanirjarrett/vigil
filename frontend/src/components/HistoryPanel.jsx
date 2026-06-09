@@ -20,10 +20,10 @@ export default function HistoryPanel() {
   const fetchHistory = async (activeTab) => {
     try {
       if (activeTab === TABS.ANOMALIES) {
-        const res = await axios.get(`${API}/api/history/anomalies`);
+        const res = await axios.get(`${API}/api/v1/history/anomalies`);
         return { anomalies: res.data.anomalies };
       } else {
-        const res = await axios.get(`${API}/api/history/alerts`);
+        const res = await axios.get(`${API}/api/v1/history/alerts`);
         return { alerts: res.data.alerts };
       }
     } catch {

@@ -17,7 +17,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Vigil API",
     description="ETL Monitoring & Observability Platform",
-    version="0.5.0",
+    version="1.0.0",
     lifespan=lifespan,
 )
 
@@ -31,16 +31,16 @@ app.add_middleware(
 )
 
 # Public — no auth required
-app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
 
 # Protected — all routes require a valid Bearer token
 _auth = [Depends(get_current_user)]
-app.include_router(glue.router,      prefix="/api/glue",      tags=["Glue"],      dependencies=_auth)
-app.include_router(anomalies.router, prefix="/api/anomalies", tags=["Anomalies"], dependencies=_auth)
-app.include_router(alerts.router,    prefix="/api/alerts",    tags=["Alerts"],    dependencies=_auth)
-app.include_router(history.router,   prefix="/api/history",   tags=["History"],   dependencies=_auth)
+app.include_router(glue.router,      prefix="/api/v1/glue",      tags=["Glue"],      dependencies=_auth)
+app.include_router(anomalies.router, prefix="/api/v1/anomalies", tags=["Anomalies"], dependencies=_auth)
+app.include_router(alerts.router,    prefix="/api/v1/alerts",    tags=["Alerts"],    dependencies=_auth)
+app.include_router(history.router,   prefix="/api/v1/history",   tags=["History"],   dependencies=_auth)
 
 
 @app.get("/health")
 def health_check():
-    return {"status": "ok", "service": "Vigil API", "version": "0.5.0"}
+    return {"status": "ok", "service": "Vigil API", "version": "1.0.0"}

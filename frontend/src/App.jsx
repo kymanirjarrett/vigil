@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
+import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import axios from "axios";
 import LoginPage from "./components/LoginPage";
+import SignupPage from "./components/SignupPage";
 import JobsTable from "./components/JobsTable";
 import JobRunsPanel from "./components/JobRunsPanel";
 import AnomalyBanner from "./components/AnomalyBanner";
@@ -8,47 +10,15 @@ import AlertsPanel from "./components/AlertsPanel";
 import HistoryPanel from "./components/HistoryPanel";
 import "./App.css";
 
-// Set header immediately at module load so any stored token is ready
-// before the first component render fires API calls.
 const _stored = localStorage.getItem("vigil_token");
+const _storedUser = (() => {
+  try { return JSON.parse(localStorage.getItem("vigil_user")); } catch { return null; }
+})();
+
 if (_stored) axios.defaults.headers.common["Authorization"] = `Bearer ${_stored}`;
 
-export default function App() {
-  const [token, setToken]             = useState(_stored);
+function Dashboard({ onLogout, user }) {
   const [selectedJob, setSelectedJob] = useState(null);
-
-  // Intercept 401s globally — clear token and fall back to login
-  useEffect(() => {
-    const id = axios.interceptors.response.use(
-      res => res,
-      err => {
-        if (err.response?.status === 401) {
-          delete axios.defaults.headers.common["Authorization"];
-          localStorage.removeItem("vigil_token");
-          setToken(null);
-        }
-        return Promise.reject(err);
-      }
-    );
-    return () => axios.interceptors.response.eject(id);
-  }, []);
-
-  const handleLogin = (newToken) => {
-    // Set header synchronously before state update so the first
-    // re-render's API calls already carry the token.
-    axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
-    localStorage.setItem("vigil_token", newToken);
-    setToken(newToken);
-  };
-
-  const handleLogout = () => {
-    delete axios.defaults.headers.common["Authorization"];
-    localStorage.removeItem("vigil_token");
-    setToken(null);
-    setSelectedJob(null);
-  };
-
-  if (!token) return <LoginPage onLogin={handleLogin} />;
 
   return (
     <div className="app">
@@ -66,7 +36,24 @@ export default function App() {
             <span className="status-text">LIVE</span>
           </div>
           <span className="region-badge">us-east-2</span>
-          <button className="btn" onClick={handleLogout} style={{ fontSize: "0.68rem" }}>
+          {user && (
+            <span style={{ fontSize: "0.68rem", color: "var(--muted)" }}>
+              {user.email}
+              <span style={{
+                marginLeft: "6px",
+                fontSize: "0.6rem",
+                padding: "1px 6px",
+                borderRadius: "3px",
+                background: user.role === "admin" ? "rgba(0,229,160,0.12)" : "rgba(90,95,114,0.2)",
+                color: user.role === "admin" ? "var(--accent)" : "var(--muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.06em",
+              }}>
+                {user.role}
+              </span>
+            </span>
+          )}
+          <button className="btn" onClick={onLogout} style={{ fontSize: "0.68rem" }}>
             Sign out
           </button>
         </div>
@@ -91,5 +78,68 @@ export default function App() {
         <HistoryPanel />
       </main>
     </div>
+  );
+}
+
+export default function App() {
+  const [token, setToken] = useState(_stored);
+  const [user, setUser]   = useState(_storedUser);
+  const navigate          = useNavigate();
+
+  useEffect(() => {
+    const id = axios.interceptors.response.use(
+      res => res,
+      err => {
+        if (err.response?.status === 401) {
+          delete axios.defaults.headers.common["Authorization"];
+          localStorage.removeItem("vigil_token");
+          localStorage.removeItem("vigil_user");
+          setToken(null);
+          setUser(null);
+          navigate("/login");
+        }
+        return Promise.reject(err);
+      }
+    );
+    return () => axios.interceptors.response.eject(id);
+  }, [navigate]);
+
+  const handleLogin = (newToken, userData) => {
+    axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
+    localStorage.setItem("vigil_token", newToken);
+    if (userData) localStorage.setItem("vigil_user", JSON.stringify(userData));
+    setToken(newToken);
+    setUser(userData);
+    navigate("/app");
+  };
+
+  const handleLogout = () => {
+    delete axios.defaults.headers.common["Authorization"];
+    localStorage.removeItem("vigil_token");
+    localStorage.removeItem("vigil_user");
+    setToken(null);
+    setUser(null);
+    navigate("/login");
+  };
+
+  return (
+    <Routes>
+      <Route
+        path="/login"
+        element={token ? <Navigate to="/app" replace /> : <LoginPage onLogin={handleLogin} />}
+      />
+      <Route
+        path="/signup"
+        element={token ? <Navigate to="/app" replace /> : <SignupPage onLogin={handleLogin} />}
+      />
+      <Route
+        path="/app"
+        element={token ? <Dashboard onLogout={handleLogout} user={user} /> : <Navigate to="/login" replace />}
+      />
+      <Route
+        path="*"
+        element={<Navigate to={token ? "/app" : "/login"} replace />}
+      />
+    </Routes>
   );
 }

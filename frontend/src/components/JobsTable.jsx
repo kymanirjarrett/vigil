@@ -11,7 +11,7 @@ export default function JobsTable({ onSelectJob, selectedJob }) {
 
   const loadJobs = async () => {
     try {
-      const res = await axios.get(`${API}/api/glue/jobs`);
+      const res = await axios.get(`${API}/api/v1/glue/jobs`);
       return res.data.jobs;
     } catch {
       throw new Error("Failed to load jobs. Is the backend running?");
