@@ -2,7 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from routers import glue, anomalies, alerts, history, auth
+from routers import glue, anomalies, alerts, history, auth, mode
 from routers.auth import get_current_user
 from database import engine
 from models import Base
@@ -39,6 +39,7 @@ app.include_router(glue.router,      prefix="/api/v1/glue",      tags=["Glue"], 
 app.include_router(anomalies.router, prefix="/api/v1/anomalies", tags=["Anomalies"], dependencies=_auth)
 app.include_router(alerts.router,    prefix="/api/v1/alerts",    tags=["Alerts"],    dependencies=_auth)
 app.include_router(history.router,   prefix="/api/v1/history",   tags=["History"],   dependencies=_auth)
+app.include_router(mode.router,      prefix="/api/v1/mode",      tags=["Mode"],      dependencies=_auth)
 
 
 @app.get("/health")
