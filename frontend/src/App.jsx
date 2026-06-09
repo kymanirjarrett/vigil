@@ -8,6 +8,7 @@ import JobRunsPanel from "./components/JobRunsPanel";
 import AnomalyBanner from "./components/AnomalyBanner";
 import AlertsPanel from "./components/AlertsPanel";
 import HistoryPanel from "./components/HistoryPanel";
+import AuditLogPage from "./components/AuditLogPage";
 import "./App.css";
 
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -23,6 +24,7 @@ function Dashboard({ onLogout, user, onUserUpdate }) {
   const [selectedJob, setSelectedJob] = useState(null);
   const [toggling, setToggling]       = useState(false);
   const [modeKey, setModeKey]         = useState(0);
+  const [view, setView]               = useState("dashboard"); // "dashboard" | "audit"
 
   const isDemo = user?.role === "analyst" || user?.demo_mode;
   const canToggle = user?.role === "admin";
@@ -107,6 +109,19 @@ function Dashboard({ onLogout, user, onUserUpdate }) {
             </span>
           )}
 
+          {user?.role === "admin" && (
+            <button
+              className="btn"
+              onClick={() => setView(v => v === "audit" ? "dashboard" : "audit")}
+              style={{
+                fontSize: "0.68rem",
+                borderColor: view === "audit" ? "var(--accent)" : undefined,
+                color: view === "audit" ? "var(--accent)" : undefined,
+              }}
+            >
+              {view === "audit" ? "← Dashboard" : "Audit Log"}
+            </button>
+          )}
           <button className="btn" onClick={onLogout} style={{ fontSize: "0.68rem" }}>
             Sign out
           </button>
@@ -114,26 +129,38 @@ function Dashboard({ onLogout, user, onUserUpdate }) {
       </header>
 
       <main className="main">
-        <div className="page-title">
-          <h1>Glue Job Monitor</h1>
-          <p>
-            {isDemo
-              ? "Viewing synthetic demo data — anomalies are pre-engineered for demonstration"
-              : "Select a job to inspect its run history"}
-          </p>
-        </div>
-
-        <AnomalyBanner key={`anomaly-${modeKey}`} />
-        <JobsTable key={`jobs-${modeKey}`} onSelectJob={setSelectedJob} selectedJob={selectedJob} />
-
-        {selectedJob && (
+        {view === "audit" ? (
           <>
-            <JobRunsPanel jobName={selectedJob} onClose={() => setSelectedJob(null)} />
-            <AlertsPanel jobName={selectedJob} user={user} />
+            <div className="page-title">
+              <h1>Audit Log</h1>
+              <p>Immutable record of all user actions — append-only</p>
+            </div>
+            <AuditLogPage />
+          </>
+        ) : (
+          <>
+            <div className="page-title">
+              <h1>Glue Job Monitor</h1>
+              <p>
+                {isDemo
+                  ? "Viewing synthetic demo data — anomalies are pre-engineered for demonstration"
+                  : "Select a job to inspect its run history"}
+              </p>
+            </div>
+
+            <AnomalyBanner key={`anomaly-${modeKey}`} />
+            <JobsTable key={`jobs-${modeKey}`} onSelectJob={setSelectedJob} selectedJob={selectedJob} />
+
+            {selectedJob && (
+              <>
+                <JobRunsPanel jobName={selectedJob} onClose={() => setSelectedJob(null)} />
+                <AlertsPanel jobName={selectedJob} user={user} />
+              </>
+            )}
+
+            <HistoryPanel />
           </>
         )}
-
-        <HistoryPanel />
       </main>
     </div>
   );
