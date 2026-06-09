@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import User
+from models import User, AuthEvent
 
 router = APIRouter()
 
@@ -30,6 +30,40 @@ def _secret_key() -> str:
 
 def _normalize_email(email: str) -> str:
     return email.strip().lower()
+
+
+def _extract_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else None
+
+
+def _record_auth_event(
+    db: Session,
+    request: Request,
+    event_type: str,
+    email: str,
+    user: User = None,
+) -> None:
+    event = AuthEvent(
+        email=email,
+        user_id=user.id if user else None,
+        event_type=event_type,
+        ip_address=_extract_ip(request),
+        user_agent=request.headers.get("user-agent"),
+    )
+    db.add(event)
+    db.commit()
+
+
+def _user_dict(user: User) -> dict:
+    return {
+        "id": str(user.id),
+        "email": user.email,
+        "role": user.role,
+        "demo_mode": user.demo_mode,
+    }
 
 
 def create_access_token(user: User) -> str:
@@ -65,15 +99,6 @@ def get_current_user(
     return user
 
 
-def _user_dict(user: User) -> dict:
-    return {
-        "id": str(user.id),
-        "email": user.email,
-        "role": user.role,
-        "demo_mode": user.demo_mode,
-    }
-
-
 class LoginRequest(BaseModel):
     email: str
     password: str
@@ -104,6 +129,8 @@ def signup(req: SignupRequest, request: Request, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
+    _record_auth_event(db, request, "signup", email, user)
+
     from audit import log_action
     log_action(db, "user.signup", request, user=user, resource_type="user", resource_id=str(user.id))
 
@@ -118,7 +145,10 @@ def signup(req: SignupRequest, request: Request, db: Session = Depends(get_db)):
 def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     email = _normalize_email(req.email)
     user = db.query(User).filter(User.email == email, User.is_active).first()
+
     if not user or not pwd_context.verify(req.password, user.password_hash):
+        # Record failure regardless of whether the email exists — needed for threat detection
+        _record_auth_event(db, request, "login_failure", email, user)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -127,6 +157,8 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
 
     user.last_login_at = datetime.now(timezone.utc)
     db.commit()
+
+    _record_auth_event(db, request, "login_success", email, user)
 
     from audit import log_action
     log_action(db, "user.login", request, user=user, resource_type="user", resource_id=str(user.id))
