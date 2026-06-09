@@ -10,6 +10,8 @@ import AlertsPanel from "./components/AlertsPanel";
 import HistoryPanel from "./components/HistoryPanel";
 import "./App.css";
 
+const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+
 const _stored = localStorage.getItem("vigil_token");
 const _storedUser = (() => {
   try { return JSON.parse(localStorage.getItem("vigil_user")); } catch { return null; }
@@ -17,8 +19,24 @@ const _storedUser = (() => {
 
 if (_stored) axios.defaults.headers.common["Authorization"] = `Bearer ${_stored}`;
 
-function Dashboard({ onLogout, user }) {
+function Dashboard({ onLogout, user, onUserUpdate }) {
   const [selectedJob, setSelectedJob] = useState(null);
+  const [toggling, setToggling]       = useState(false);
+
+  const isDemo = user?.role === "analyst" || user?.demo_mode;
+  const canToggle = user?.role === "admin";
+
+  const handleModeToggle = async () => {
+    setToggling(true);
+    try {
+      const res = await axios.post(`${API}/api/v1/mode/toggle`);
+      onUserUpdate({ ...user, demo_mode: res.data.demo_mode });
+    } catch (e) {
+      console.error("Mode toggle failed", e);
+    } finally {
+      setToggling(false);
+    }
+  };
 
   return (
     <div className="app">
@@ -31,11 +49,42 @@ function Dashboard({ onLogout, user }) {
           <span className="logo-sub">ETL Observability Platform</span>
         </div>
         <div className="header-right">
+          {/* Mode indicator / toggle */}
+          {canToggle ? (
+            <button
+              className="btn"
+              onClick={handleModeToggle}
+              disabled={toggling}
+              style={{
+                fontSize: "0.65rem",
+                padding: "4px 12px",
+                borderColor: isDemo ? "var(--warn)" : "var(--accent)",
+                color: isDemo ? "var(--warn)" : "var(--accent)",
+              }}
+            >
+              {toggling ? "…" : isDemo ? "DEMO — switch to LIVE" : "LIVE — switch to DEMO"}
+            </button>
+          ) : (
+            <span style={{
+              fontSize: "0.6rem",
+              padding: "3px 10px",
+              borderRadius: "3px",
+              background: "rgba(245,166,35,0.12)",
+              color: "var(--warn)",
+              letterSpacing: "0.08em",
+              fontWeight: 600,
+            }}>
+              DEMO MODE
+            </span>
+          )}
+
           <div className="status-indicator">
-            <span className="pulse" />
-            <span className="status-text">LIVE</span>
+            <span className="pulse" style={{ background: isDemo ? "var(--warn)" : undefined }} />
+            <span className="status-text">{isDemo ? "DEMO" : "LIVE"}</span>
           </div>
-          <span className="region-badge">us-east-2</span>
+
+          {!isDemo && <span className="region-badge">us-east-2</span>}
+
           {user && (
             <span style={{ fontSize: "0.68rem", color: "var(--muted)" }}>
               {user.email}
@@ -53,6 +102,7 @@ function Dashboard({ onLogout, user }) {
               </span>
             </span>
           )}
+
           <button className="btn" onClick={onLogout} style={{ fontSize: "0.68rem" }}>
             Sign out
           </button>
@@ -62,7 +112,11 @@ function Dashboard({ onLogout, user }) {
       <main className="main">
         <div className="page-title">
           <h1>Glue Job Monitor</h1>
-          <p>Select a job to inspect its run history</p>
+          <p>
+            {isDemo
+              ? "Viewing synthetic demo data — anomalies are pre-engineered for demonstration"
+              : "Select a job to inspect its run history"}
+          </p>
         </div>
 
         <AnomalyBanner />
@@ -71,7 +125,7 @@ function Dashboard({ onLogout, user }) {
         {selectedJob && (
           <>
             <JobRunsPanel jobName={selectedJob} onClose={() => setSelectedJob(null)} />
-            <AlertsPanel jobName={selectedJob} />
+            <AlertsPanel jobName={selectedJob} user={user} />
           </>
         )}
 
@@ -122,6 +176,11 @@ export default function App() {
     navigate("/login");
   };
 
+  const handleUserUpdate = (updatedUser) => {
+    localStorage.setItem("vigil_user", JSON.stringify(updatedUser));
+    setUser(updatedUser);
+  };
+
   return (
     <Routes>
       <Route
@@ -134,7 +193,11 @@ export default function App() {
       />
       <Route
         path="/app"
-        element={token ? <Dashboard onLogout={handleLogout} user={user} /> : <Navigate to="/login" replace />}
+        element={
+          token
+            ? <Dashboard onLogout={handleLogout} user={user} onUserUpdate={handleUserUpdate} />
+            : <Navigate to="/login" replace />
+        }
       />
       <Route
         path="*"
