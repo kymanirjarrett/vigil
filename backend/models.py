@@ -18,6 +18,18 @@ class User(Base):
     last_login_at = Column(DateTime(timezone=True), nullable=True)
 
 
+class AuthEvent(Base):
+    __tablename__ = "auth_events"
+
+    id         = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email      = Column(String, nullable=False, index=True)
+    user_id    = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    event_type = Column(String, nullable=False, index=True)  # login_success | login_failure | signup
+    ip_address = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+
+
 class AuditLogEntry(Base):
     __tablename__ = "audit_log"
 
