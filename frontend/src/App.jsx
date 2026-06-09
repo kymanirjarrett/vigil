@@ -9,6 +9,7 @@ import AnomalyBanner from "./components/AnomalyBanner";
 import AlertsPanel from "./components/AlertsPanel";
 import HistoryPanel from "./components/HistoryPanel";
 import AuditLogPage from "./components/AuditLogPage";
+import SecurityEventsPage from "./components/SecurityEventsPage";
 import "./App.css";
 
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -24,7 +25,7 @@ function Dashboard({ onLogout, user, onUserUpdate }) {
   const [selectedJob, setSelectedJob] = useState(null);
   const [toggling, setToggling]       = useState(false);
   const [modeKey, setModeKey]         = useState(0);
-  const [view, setView]               = useState("dashboard"); // "dashboard" | "audit"
+  const [view, setView]               = useState("dashboard"); // "dashboard" | "audit" | "security"
 
   const isDemo = user?.role === "analyst" || user?.demo_mode;
   const canToggle = user?.role === "admin";
@@ -110,17 +111,30 @@ function Dashboard({ onLogout, user, onUserUpdate }) {
           )}
 
           {user?.role === "admin" && (
-            <button
-              className="btn"
-              onClick={() => setView(v => v === "audit" ? "dashboard" : "audit")}
-              style={{
-                fontSize: "0.68rem",
-                borderColor: view === "audit" ? "var(--accent)" : undefined,
-                color: view === "audit" ? "var(--accent)" : undefined,
-              }}
-            >
-              {view === "audit" ? "← Dashboard" : "Audit Log"}
-            </button>
+            <>
+              <button
+                className="btn"
+                onClick={() => setView(v => v === "audit" ? "dashboard" : "audit")}
+                style={{
+                  fontSize: "0.68rem",
+                  borderColor: view === "audit" ? "var(--accent)" : undefined,
+                  color: view === "audit" ? "var(--accent)" : undefined,
+                }}
+              >
+                {view === "audit" ? "← Dashboard" : "Audit Log"}
+              </button>
+              <button
+                className="btn"
+                onClick={() => setView(v => v === "security" ? "dashboard" : "security")}
+                style={{
+                  fontSize: "0.68rem",
+                  borderColor: view === "security" ? "var(--danger)" : undefined,
+                  color: view === "security" ? "var(--danger)" : undefined,
+                }}
+              >
+                {view === "security" ? "← Dashboard" : "Security"}
+              </button>
+            </>
           )}
           <button className="btn" onClick={onLogout} style={{ fontSize: "0.68rem" }}>
             Sign out
@@ -136,6 +150,14 @@ function Dashboard({ onLogout, user, onUserUpdate }) {
               <p>Immutable record of all user actions — append-only</p>
             </div>
             <AuditLogPage />
+          </>
+        ) : view === "security" ? (
+          <>
+            <div className="page-title">
+              <h1>Security Events</h1>
+              <p>Authentication event stream — all login attempts, successes, and signups</p>
+            </div>
+            <SecurityEventsPage />
           </>
         ) : (
           <>
