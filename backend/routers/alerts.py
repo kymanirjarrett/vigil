@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from aws_client import get_glue_client
@@ -114,6 +114,7 @@ def send_alert_email(recipient: str, job_name: str, anomalies: list):
 @router.post("/trigger")
 def trigger_alert(
     req: AlertRequest,
+    request: Request,
     current_user: User = Depends(require_permission("alerts:trigger")),
     db: Session = Depends(get_db),
 ):
@@ -156,6 +157,11 @@ def trigger_alert(
         )
         db.add(log_entry)
         db.commit()
+
+        from audit import log_action
+        log_action(db, "alert.triggered", request, user=current_user,
+                   resource_type="glue_job", resource_id=req.job_name,
+                   metadata={"anomaly_count": len(anomalies), "recipient": req.recipient_email})
 
         return {
             "sent":            True,

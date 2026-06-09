@@ -2,7 +2,7 @@ import os
 import uuid as uuid_lib
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -85,7 +85,7 @@ class SignupRequest(BaseModel):
 
 
 @router.post("/signup", status_code=201)
-def signup(req: SignupRequest, db: Session = Depends(get_db)):
+def signup(req: SignupRequest, request: Request, db: Session = Depends(get_db)):
     if len(req.password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 
@@ -104,6 +104,9 @@ def signup(req: SignupRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
+    from audit import log_action
+    log_action(db, "user.signup", request, user=user, resource_type="user", resource_id=str(user.id))
+
     return {
         "access_token": create_access_token(user),
         "token_type": "bearer",
@@ -112,7 +115,7 @@ def signup(req: SignupRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login")
-def login(req: LoginRequest, db: Session = Depends(get_db)):
+def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     email = _normalize_email(req.email)
     user = db.query(User).filter(User.email == email, User.is_active).first()
     if not user or not pwd_context.verify(req.password, user.password_hash):
@@ -124,6 +127,9 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
 
     user.last_login_at = datetime.now(timezone.utc)
     db.commit()
+
+    from audit import log_action
+    log_action(db, "user.login", request, user=user, resource_type="user", resource_id=str(user.id))
 
     return {
         "access_token": create_access_token(user),
