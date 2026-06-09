@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, UniqueConstraint, ForeignKey, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from database import Base
@@ -16,6 +16,20 @@ class User(Base):
     demo_mode     = Column(Boolean, nullable=False, default=False)
     created_at    = Column(DateTime(timezone=True), server_default=func.now())
     last_login_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class AuditLogEntry(Base):
+    __tablename__ = "audit_log"
+
+    id            = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id       = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    action        = Column(String, nullable=False, index=True)
+    resource_type = Column(String, nullable=True)
+    resource_id   = Column(String, nullable=True)
+    meta          = Column("metadata", JSON, nullable=True)
+    ip_address    = Column(String, nullable=True)
+    user_agent    = Column(String, nullable=True)
+    created_at    = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 
 class AnomalyEvent(Base):
