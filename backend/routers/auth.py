@@ -1,13 +1,16 @@
+import os
+import uuid as uuid_lib
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta, timezone
+
 from database import get_db
 from models import User
-import os
 
 router = APIRouter()
 
@@ -23,6 +26,10 @@ def _secret_key() -> str:
     if not key:
         raise RuntimeError("VIGIL_JWT_SECRET is not set in .env")
     return key
+
+
+def _normalize_email(email: str) -> str:
+    return email.strip().lower()
 
 
 def create_access_token(user: User) -> str:
@@ -45,10 +52,11 @@ def get_current_user(
     )
     try:
         payload = jwt.decode(token, _secret_key(), algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
-        if not user_id:
+        user_id_str: str = payload.get("sub")
+        if not user_id_str:
             raise credentials_exc
-    except JWTError:
+        user_id = uuid_lib.UUID(user_id_str)
+    except (JWTError, ValueError):
         raise credentials_exc
 
     user = db.query(User).filter(User.id == user_id, User.is_active).first()
@@ -72,12 +80,13 @@ def signup(req: SignupRequest, db: Session = Depends(get_db)):
     if len(req.password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
 
-    existing = db.query(User).filter(User.email == req.email).first()
+    email = _normalize_email(req.email)
+    existing = db.query(User).filter(User.email == email).first()
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
     user = User(
-        email=req.email,
+        email=email,
         password_hash=pwd_context.hash(req.password),
         role="analyst",
     )
@@ -86,17 +95,16 @@ def signup(req: SignupRequest, db: Session = Depends(get_db)):
     db.refresh(user)
 
     return {
-        "id": str(user.id),
-        "email": user.email,
-        "role": user.role,
         "access_token": create_access_token(user),
         "token_type": "bearer",
+        "user": {"id": str(user.id), "email": user.email, "role": user.role},
     }
 
 
 @router.post("/login")
 def login(req: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == req.email, User.is_active).first()
+    email = _normalize_email(req.email)
+    user = db.query(User).filter(User.email == email, User.is_active).first()
     if not user or not pwd_context.verify(req.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

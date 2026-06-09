@@ -16,7 +16,7 @@ from models import User
 
 load_dotenv()
 
-email = os.environ["VIGIL_ADMIN_EMAIL"]
+email = os.environ["VIGIL_ADMIN_EMAIL"].strip().lower()
 existing_hash = os.getenv("VIGIL_PASSWORD_HASH")
 plaintext = os.getenv("VIGIL_ADMIN_PASSWORD")
 
