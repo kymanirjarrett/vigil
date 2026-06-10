@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import axios from "axios";
+import LandingPage from "./components/LandingPage";
 import LoginPage from "./components/LoginPage";
 import SignupPage from "./components/SignupPage";
 import JobsTable from "./components/JobsTable";
@@ -237,6 +238,10 @@ export default function App() {
   return (
     <Routes>
       <Route
+        path="/"
+        element={token ? <Navigate to="/app" replace /> : <LandingPage />}
+      />
+      <Route
         path="/login"
         element={token ? <Navigate to="/app" replace /> : <LoginPage onLogin={handleLogin} />}
       />
@@ -249,12 +254,12 @@ export default function App() {
         element={
           token
             ? <Dashboard onLogout={handleLogout} user={user} onUserUpdate={handleUserUpdate} />
-            : <Navigate to="/login" replace />
+            : <Navigate to="/" replace />
         }
       />
       <Route
         path="*"
-        element={<Navigate to={token ? "/app" : "/login"} replace />}
+        element={<Navigate to={token ? "/app" : "/"} replace />}
       />
     </Routes>
   );
