@@ -2,7 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from routers import glue, anomalies, alerts, history, auth, mode, audit, auth_events, auth_anomalies
+from routers import glue, anomalies, alerts, history, auth, mode, audit, auth_events, auth_anomalies, admin
 from routers.auth import get_current_user
 from database import engine
 from models import Base
@@ -43,6 +43,7 @@ app.include_router(mode.router,      prefix="/api/v1/mode",      tags=["Mode"], 
 app.include_router(audit.router,      prefix="/api/v1/audit",       tags=["Audit"],       dependencies=_auth)
 app.include_router(auth_events.router,    prefix="/api/v1/auth-events",    tags=["AuthEvents"],    dependencies=_auth)
 app.include_router(auth_anomalies.router, prefix="/api/v1/auth-anomalies", tags=["AuthAnomalies"], dependencies=_auth)
+app.include_router(admin.router,          prefix="/api/v1/admin",          tags=["Admin"],          dependencies=_auth)
 
 
 @app.get("/health")
