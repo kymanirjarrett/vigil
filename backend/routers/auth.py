@@ -14,7 +14,9 @@ from models import User, AuthEvent
 
 router = APIRouter()
 
-ALGORITHM = "HS256"
+ALGORITHM          = "HS256"
+MAX_LOGIN_ATTEMPTS = int(os.getenv("MAX_LOGIN_ATTEMPTS", "5"))
+LOCKOUT_MINUTES    = int(os.getenv("LOCKOUT_MINUTES",    "15"))
 ACCESS_TOKEN_EXPIRE_HOURS = 8
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -144,18 +146,46 @@ def signup(req: SignupRequest, request: Request, db: Session = Depends(get_db)):
 @router.post("/login")
 def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     email = _normalize_email(req.email)
-    user = db.query(User).filter(User.email == email, User.is_active).first()
+    user  = db.query(User).filter(User.email == email, User.is_active).first()
+
+    # Check lockout before password verification
+    now = datetime.now(timezone.utc)
+    if user and user.locked_until and user.locked_until > now:
+        _record_auth_event(db, request, "login_failure", email, user)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts, please try again later",
+        )
 
     if not user or not pwd_context.verify(req.password, user.password_hash):
         # Record failure regardless of whether the email exists — needed for threat detection
         _record_auth_event(db, request, "login_failure", email, user)
+
+        # Enforce lockout on non-admin accounts after repeated failures
+        if user and user.role != "admin":
+            window_start   = now - timedelta(minutes=LOCKOUT_MINUTES)
+            failure_count  = db.query(AuthEvent).filter(
+                AuthEvent.email      == email,
+                AuthEvent.event_type == "login_failure",
+                AuthEvent.created_at >= window_start,
+            ).count()
+            if failure_count >= MAX_LOGIN_ATTEMPTS:
+                user.locked_until = now + timedelta(minutes=LOCKOUT_MINUTES)
+                db.commit()
+                from audit import log_action
+                log_action(db, "user.locked", request, user=user, resource_type="user", resource_id=str(user.id))
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    user.last_login_at = datetime.now(timezone.utc)
+    # Clear any expired lockout on successful login
+    if user.locked_until:
+        user.locked_until = None
+
+    user.last_login_at = now
     db.commit()
 
     _record_auth_event(db, request, "login_success", email, user)
