@@ -703,6 +703,8 @@ tbody tr.selected td { color: var(--accent); }
 }
 
 @media (max-width: 600px) {
+  .landing-nav { padding: 0 1.25rem; }
+
   .landing-nav-links { display: none; }
 
   .landing-features-grid {
