@@ -39,34 +39,22 @@ function TypeBadge({ type }) {
 }
 
 export default function ThreatDetectionPage() {
-  const [data, setData]             = useState(null);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState(null);
-  const [lookback, setLookback]     = useState(24);
-  const [scanTick, setScanTick]     = useState(0);
+  const [data, setData]         = useState(null);
+  const [error, setError]       = useState(null);
+  const [lookback, setLookback] = useState(24);
+  const [scanTick, setScanTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError(null);
 
     axios.get(`${API}/api/v1/auth-anomalies`, { params: { lookback_hours: lookback } })
-      .then(res => {
-        if (!cancelled) {
-          setData(res.data);
-          setLoading(false);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setError("Failed to run threat scan.");
-          setLoading(false);
-        }
-      });
+      .then(res => { if (!cancelled) { setError(null); setData(res.data); } })
+      .catch(() => { if (!cancelled) setError("Failed to run threat scan."); });
 
     return () => { cancelled = true; };
   }, [lookback, scanTick]);
 
+  const loading   = data === null && !error;
   const anomalies = data?.anomalies ?? [];
   const critical  = anomalies.filter(a => a.severity === "critical").length;
   const warnings  = anomalies.filter(a => a.severity === "warning").length;
@@ -97,7 +85,7 @@ export default function ThreatDetectionPage() {
           <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
             <select
               value={lookback}
-              onChange={e => { setLookback(Number(e.target.value)); setData(null); }}
+              onChange={e => { setData(null); setError(null); setLookback(Number(e.target.value)); }}
               style={{
                 background: "var(--bg)", border: "1px solid var(--border2)", borderRadius: "4px",
                 padding: "4px 8px", color: "var(--text)", fontSize: "0.72rem",
