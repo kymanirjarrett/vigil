@@ -12,6 +12,7 @@ PERMISSIONS = {
         "users:read",
         "users:manage",
         "audit:read",
+        "security:read",
         "mode:toggle",
     },
     "analyst": {
