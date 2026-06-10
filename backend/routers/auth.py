@@ -2,9 +2,6 @@ import os
 import uuid as uuid_lib
 from datetime import datetime, timedelta, timezone
 
-MAX_LOGIN_ATTEMPTS = int(os.getenv("MAX_LOGIN_ATTEMPTS", "5"))
-LOCKOUT_MINUTES    = int(os.getenv("LOCKOUT_MINUTES",    "15"))
-
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
@@ -17,7 +14,9 @@ from models import User, AuthEvent
 
 router = APIRouter()
 
-ALGORITHM = "HS256"
+ALGORITHM          = "HS256"
+MAX_LOGIN_ATTEMPTS = int(os.getenv("MAX_LOGIN_ATTEMPTS", "5"))
+LOCKOUT_MINUTES    = int(os.getenv("LOCKOUT_MINUTES",    "15"))
 ACCESS_TOKEN_EXPIRE_HOURS = 8
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
