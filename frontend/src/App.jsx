@@ -8,6 +8,7 @@ import AppShell from "./components/AppShell";
 import DashboardView from "./components/DashboardView";
 import AuditLogPage from "./components/AuditLogPage";
 import SecurityEventsPage from "./components/SecurityEventsPage";
+import ThreatDetectionPage from "./components/ThreatDetectionPage";
 import "./App.css";
 
 const _stored = localStorage.getItem("vigil_token");
@@ -37,6 +38,18 @@ function SecurityRoute() {
         <p>Authentication event stream — all login attempts, successes, and signups</p>
       </div>
       <SecurityEventsPage />
+    </>
+  );
+}
+
+function ThreatDetectionRoute() {
+  return (
+    <>
+      <div className="page-title">
+        <h1>Threat Detection</h1>
+        <p>Live scan for brute-force and credential-stuffing attacks in auth event history</p>
+      </div>
+      <ThreatDetectionPage />
     </>
   );
 }
@@ -119,6 +132,10 @@ export default function App() {
         <Route
           path="security"
           element={user?.role === "admin" ? <SecurityRoute /> : <Navigate to="/app/dashboard" replace />}
+        />
+        <Route
+          path="threats"
+          element={user?.role === "admin" ? <ThreatDetectionRoute /> : <Navigate to="/app/dashboard" replace />}
         />
       </Route>
 

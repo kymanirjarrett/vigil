@@ -141,3 +141,36 @@ def get_demo_jobs() -> list[dict]:
 
 def get_demo_runs(job_name: str) -> list[dict]:
     return _DEMO_RUNS.get(job_name, [])
+
+
+def get_demo_auth_anomalies() -> list[dict]:
+    """
+    Pre-computed demo findings so the Threat Detection page always tells a story.
+    Two scenarios:
+      - Credential stuffing: 14 accounts targeted from a single IP
+      - Brute force: 7 rapid failures against one account
+    """
+    return [
+        {
+            "type":        "CREDENTIAL_STUFFING",
+            "severity":    "critical",
+            "email":       None,
+            "ip_address":  "203.0.113.45",
+            "message":     (
+                "Login failures targeting 14 unique accounts from "
+                "203.0.113.45 within 5 minutes."
+            ),
+            "detected_at": (_NOW - timedelta(minutes=3)).isoformat(),
+        },
+        {
+            "type":        "BRUTE_FORCE",
+            "severity":    "warning",
+            "email":       "alice@acme-corp.io",
+            "ip_address":  None,
+            "message":     (
+                "7 failed login attempts for alice@acme-corp.io "
+                "within 10 minutes."
+            ),
+            "detected_at": (_NOW - timedelta(minutes=8)).isoformat(),
+        },
+    ]
