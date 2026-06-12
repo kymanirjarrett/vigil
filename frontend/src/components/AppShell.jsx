@@ -5,12 +5,13 @@ import axios from "axios";
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 const NAV_ITEMS = [
-  { to: "/app/dashboard", label: "Dashboard",        icon: "◈", roles: ["admin", "analyst"] },
-  { to: "/app/sessions",  label: "Sessions",         icon: "⊞", roles: ["admin", "analyst"] },
-  { to: "/app/posture",   label: "Security Posture", icon: "◉", roles: ["admin"] },
-  { to: "/app/threats",   label: "Threat Detection", icon: "⚠", roles: ["admin"] },
-  { to: "/app/security",  label: "Security Events",  icon: "⊙", roles: ["admin"] },
-  { to: "/app/audit",     label: "Audit Log",        icon: "⊕", roles: ["admin"] },
+  { to: "/app/dashboard",   label: "Dashboard",        icon: "◈", roles: ["admin", "analyst"] },
+  { to: "/app/sessions",    label: "Sessions",         icon: "⊞", roles: ["admin", "analyst"] },
+  { to: "/app/admin/users", label: "User Management",  icon: "⊛", roles: ["admin"] },
+  { to: "/app/posture",     label: "Security Posture", icon: "◉", roles: ["admin"] },
+  { to: "/app/threats",     label: "Threat Detection", icon: "⚠", roles: ["admin"] },
+  { to: "/app/security",    label: "Security Events",  icon: "⊙", roles: ["admin"] },
+  { to: "/app/audit",       label: "Audit Log",        icon: "⊕", roles: ["admin"] },
 ];
 
 export default function AppShell({ user, onLogout, onUserUpdate }) {
