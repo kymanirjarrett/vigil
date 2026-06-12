@@ -286,7 +286,7 @@ def logout(
     now = datetime.now(timezone.utc)
     db.query(RefreshToken).filter(
         RefreshToken.user_id    == current_user.id,
-        RefreshToken.is_revoked == False,
+        ~RefreshToken.is_revoked,
     ).update({"is_revoked": True, "revoked_at": now})
     db.commit()
     return {"message": "Logged out"}
@@ -302,7 +302,7 @@ def list_sessions(
         db.query(RefreshToken)
         .filter(
             RefreshToken.user_id    == current_user.id,
-            RefreshToken.is_revoked == False,
+            ~RefreshToken.is_revoked,
             RefreshToken.expires_at >  now,
         )
         .order_by(RefreshToken.created_at.desc())

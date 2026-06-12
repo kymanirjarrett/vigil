@@ -64,7 +64,7 @@ def revoke_user_sessions(
     now = datetime.now(timezone.utc)
     db.query(RefreshToken).filter(
         RefreshToken.user_id    == uid,
-        RefreshToken.is_revoked == False,
+        ~RefreshToken.is_revoked,
     ).update({"is_revoked": True, "revoked_at": now})
     db.commit()
 
