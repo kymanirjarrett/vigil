@@ -9,6 +9,7 @@ import DashboardView from "./components/DashboardView";
 import AuditLogPage from "./components/AuditLogPage";
 import SecurityEventsPage from "./components/SecurityEventsPage";
 import ThreatDetectionPage from "./components/ThreatDetectionPage";
+import SecurityPosturePage from "./components/SecurityPosturePage";
 import "./App.css";
 
 const _stored = localStorage.getItem("vigil_token");
@@ -38,6 +39,18 @@ function SecurityRoute() {
         <p>Authentication event stream — all login attempts, successes, and signups</p>
       </div>
       <SecurityEventsPage />
+    </>
+  );
+}
+
+function SecurityPostureRoute() {
+  return (
+    <>
+      <div className="page-title">
+        <h1>Security Posture</h1>
+        <p>Aggregated security metrics — login activity, anomalies, and recent events</p>
+      </div>
+      <SecurityPosturePage />
     </>
   );
 }
@@ -132,6 +145,10 @@ export default function App() {
         <Route
           path="security"
           element={user?.role === "admin" ? <SecurityRoute /> : <Navigate to="/app/dashboard" replace />}
+        />
+        <Route
+          path="posture"
+          element={user?.role === "admin" ? <SecurityPostureRoute /> : <Navigate to="/app/dashboard" replace />}
         />
         <Route
           path="threats"
