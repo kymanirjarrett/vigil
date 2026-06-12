@@ -85,3 +85,33 @@ class AlertLog(Base):
     anomaly_count   = Column(Integer, nullable=False)
     sent_at         = Column(DateTime(timezone=True), server_default=func.now())
     sendgrid_status = Column(Integer, nullable=True)
+
+
+class Role(Base):
+    __tablename__ = "roles"
+
+    id          = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name        = Column(String, unique=True, nullable=False, index=True)
+    description = Column(String, nullable=True)
+    created_at  = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class Permission(Base):
+    __tablename__ = "permissions"
+
+    id         = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name       = Column(String, unique=True, nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class RolePermission(Base):
+    __tablename__ = "role_permissions"
+
+    id            = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    role_id       = Column(UUID(as_uuid=True), ForeignKey("roles.id", ondelete="CASCADE"), nullable=False, index=True)
+    permission_id = Column(UUID(as_uuid=True), ForeignKey("permissions.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at    = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("role_id", "permission_id", name="uq_role_permission"),
+    )
