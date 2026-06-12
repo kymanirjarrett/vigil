@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, Link } from "react-router-dom";
 import axios from "axios";
 
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -96,12 +96,14 @@ export default function AppShell({ user, onLogout, onUserUpdate }) {
           )}
 
           {!collapsed && user && (
-            <div className="sidebar-user">
-              <span className="sidebar-user-email">{user.email}</span>
-              <span className={`sidebar-role-badge${user.role === "admin" ? " admin" : ""}`}>
-                {user.role}
-              </span>
-            </div>
+            <Link to="/app/account" style={{ textDecoration: "none" }}>
+              <div className="sidebar-user" title="Account settings">
+                <span className="sidebar-user-email">{user.email}</span>
+                <span className={`sidebar-role-badge${user.role === "admin" ? " admin" : ""}`}>
+                  {user.role}
+                </span>
+              </div>
+            </Link>
           )}
 
           <button className="sidebar-signout" onClick={onLogout}>

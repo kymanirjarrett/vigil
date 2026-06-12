@@ -13,6 +13,7 @@ import SecurityPosturePage from "./components/SecurityPosturePage";
 import SessionsPage from "./components/SessionsPage";
 import AdminUsersPage from "./components/AdminUsersPage";
 import PermissionsPage from "./components/PermissionsPage";
+import AccountPage from "./components/AccountPage";
 import "./App.css";
 
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -92,6 +93,18 @@ function PermissionsRoute() {
         <p>Live role-permission matrix — toggle access rights without a code deploy</p>
       </div>
       <PermissionsPage />
+    </>
+  );
+}
+
+function AccountRoute({ user }) {
+  return (
+    <>
+      <div className="page-title">
+        <h1>Account</h1>
+        <p>Manage your profile and two-factor authentication</p>
+      </div>
+      <AccountPage user={user} />
     </>
   );
 }
@@ -268,6 +281,7 @@ export default function App() {
           path="audit"
           element={user?.role === "admin" ? <AuditRoute /> : <Navigate to="/app/dashboard" replace />}
         />
+        <Route path="account" element={<AccountRoute user={user} />} />
       </Route>
 
       <Route
