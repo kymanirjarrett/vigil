@@ -12,6 +12,7 @@ import ThreatDetectionPage from "./components/ThreatDetectionPage";
 import SecurityPosturePage from "./components/SecurityPosturePage";
 import SessionsPage from "./components/SessionsPage";
 import AdminUsersPage from "./components/AdminUsersPage";
+import PermissionsPage from "./components/PermissionsPage";
 import "./App.css";
 
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -79,6 +80,18 @@ function AdminUsersRoute({ user }) {
         <p>Manage roles, lockouts, and sessions for all accounts</p>
       </div>
       <AdminUsersPage currentUserId={user?.id} />
+    </>
+  );
+}
+
+function PermissionsRoute() {
+  return (
+    <>
+      <div className="page-title">
+        <h1>Permissions</h1>
+        <p>Live role-permission matrix — toggle access rights without a code deploy</p>
+      </div>
+      <PermissionsPage />
     </>
   );
 }
@@ -234,6 +247,10 @@ export default function App() {
         <Route
           path="admin/users"
           element={user?.role === "admin" ? <AdminUsersRoute user={user} /> : <Navigate to="/app/dashboard" replace />}
+        />
+        <Route
+          path="admin/permissions"
+          element={user?.role === "admin" ? <PermissionsRoute /> : <Navigate to="/app/dashboard" replace />}
         />
         <Route
           path="posture"
