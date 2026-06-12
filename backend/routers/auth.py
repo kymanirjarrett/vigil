@@ -77,6 +77,16 @@ def create_access_token(user: User) -> str:
     )
 
 
+def create_pre_auth_token(user_id: str) -> str:
+    """Short-lived token issued after password verification when TOTP is required."""
+    expire = datetime.now(timezone.utc) + timedelta(minutes=5)
+    return jwt.encode(
+        {"sub": user_id, "stage": "pre_2fa", "exp": expire},
+        _secret_key(),
+        algorithm=ALGORITHM,
+    )
+
+
 def _issue_refresh_token(
     db: Session,
     user: User,
@@ -223,6 +233,12 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
 
     from audit import log_action
     log_action(db, "user.login", request, user=user, resource_type="user", resource_id=str(user.id))
+
+    if user.totp_enabled:
+        return {
+            "requires_2fa": True,
+            "temp_token":   create_pre_auth_token(str(user.id)),
+        }
 
     access_token      = create_access_token(user)
     refresh_raw, _    = _issue_refresh_token(db, user, request)

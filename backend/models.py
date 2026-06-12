@@ -29,6 +29,8 @@ class User(Base):
     role          = Column(String, nullable=False, default="analyst")
     is_active     = Column(Boolean, nullable=False, default=True)
     demo_mode     = Column(Boolean, nullable=False, default=False)
+    totp_secret   = Column(String, nullable=True)
+    totp_enabled  = Column(Boolean, nullable=False, default=False)
     created_at    = Column(DateTime(timezone=True), server_default=func.now())
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     locked_until  = Column(DateTime(timezone=True), nullable=True)
@@ -115,3 +117,14 @@ class RolePermission(Base):
     __table_args__ = (
         UniqueConstraint("role_id", "permission_id", name="uq_role_permission"),
     )
+
+
+class BackupCode(Base):
+    __tablename__ = "backup_codes"
+
+    id         = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id    = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    code_hash  = Column(String, nullable=False)
+    used       = Column(Boolean, nullable=False, default=False)
+    used_at    = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

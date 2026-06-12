@@ -2,7 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from routers import glue, anomalies, alerts, history, auth, mode, audit, auth_events, auth_anomalies, admin, security
+from routers import glue, anomalies, alerts, history, auth, mode, audit, auth_events, auth_anomalies, admin, security, totp
 from routers.auth import get_current_user
 from database import engine
 from models import Base
@@ -31,7 +31,8 @@ app.add_middleware(
 )
 
 # Public — no auth required
-app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
+app.include_router(auth.router,  prefix="/api/v1/auth", tags=["Auth"])
+app.include_router(totp.router,  prefix="/api/v1/auth", tags=["TOTP"])
 
 # Protected — all routes require a valid Bearer token
 _auth = [Depends(get_current_user)]
