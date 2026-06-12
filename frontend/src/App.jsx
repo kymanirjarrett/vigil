@@ -11,6 +11,7 @@ import SecurityEventsPage from "./components/SecurityEventsPage";
 import ThreatDetectionPage from "./components/ThreatDetectionPage";
 import SecurityPosturePage from "./components/SecurityPosturePage";
 import SessionsPage from "./components/SessionsPage";
+import AdminUsersPage from "./components/AdminUsersPage";
 import "./App.css";
 
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
@@ -66,6 +67,18 @@ function ThreatDetectionRoute() {
         <p>Live scan for brute-force and credential-stuffing attacks in auth event history</p>
       </div>
       <ThreatDetectionPage />
+    </>
+  );
+}
+
+function AdminUsersRoute({ user }) {
+  return (
+    <>
+      <div className="page-title">
+        <h1>User Management</h1>
+        <p>Manage roles, lockouts, and sessions for all accounts</p>
+      </div>
+      <AdminUsersPage currentUserId={user?.id} />
     </>
   );
 }
@@ -218,6 +231,10 @@ export default function App() {
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<DashboardView />} />
         <Route path="sessions"  element={<SessionsRoute />} />
+        <Route
+          path="admin/users"
+          element={user?.role === "admin" ? <AdminUsersRoute user={user} /> : <Navigate to="/app/dashboard" replace />}
+        />
         <Route
           path="posture"
           element={user?.role === "admin" ? <SecurityPostureRoute /> : <Navigate to="/app/dashboard" replace />}
