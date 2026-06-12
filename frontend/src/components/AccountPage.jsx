@@ -31,7 +31,6 @@ function BackupCodeGrid({ codes }) {
 function EnrollFlow({ onDone }) {
   const [step, setStep]         = useState("qr");   // qr | confirm | done
   const [secret, setSecret]     = useState(null);
-  const [uri, setUri]           = useState(null);
   const [qrUrl, setQrUrl]       = useState(null);
   const [code, setCode]         = useState("");
   const [error, setError]       = useState(null);
@@ -42,7 +41,6 @@ function EnrollFlow({ onDone }) {
     axios.post(`${API}/api/v1/auth/totp/enroll`)
       .then(res => {
         setSecret(res.data.secret);
-        setUri(res.data.uri);
         QRCode.toDataURL(res.data.uri, { width: 200, margin: 2 }).then(setQrUrl);
       })
       .catch(() => setError("Failed to start enrollment."));
@@ -260,11 +258,6 @@ export default function AccountPage({ user }) {
       .then(res => setTotpEnabled(res.data.enabled))
       .finally(() => setLoading(false));
   }, []);
-
-  const closePanel = (newEnabled) => {
-    if (typeof newEnabled === "boolean") setTotpEnabled(newEnabled);
-    setPanel(null);
-  };
 
   return (
     <div style={{ maxWidth: 520 }}>
