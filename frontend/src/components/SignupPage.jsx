@@ -25,7 +25,7 @@ export default function SignupPage({ onLogin }) {
     setError(null);
     try {
       const res = await axios.post(`${API}/api/v1/auth/signup`, { email, password });
-      onLogin(res.data.access_token, res.data.user);
+      onLogin(res.data.access_token, res.data.user, res.data.refresh_token);
     } catch (err) {
       if (err.response?.status === 409) {
         setError("An account with that email already exists.");

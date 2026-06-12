@@ -16,12 +16,14 @@ export default function LoginPage({ onLogin }) {
     setError(null);
     try {
       const res = await axios.post(`${API}/api/v1/auth/login`, { email, password });
-      onLogin(res.data.access_token, res.data.user);
+      onLogin(res.data.access_token, res.data.user, res.data.refresh_token);
     } catch (err) {
       setError(
-        err.response?.status === 401
-          ? "Invalid email or password."
-          : "Could not reach the server. Is the backend running?"
+        err.response?.status === 429
+          ? "Too many login attempts, please try again later."
+          : err.response?.status === 401
+            ? "Invalid email or password."
+            : "Could not reach the server. Is the backend running?"
       );
     } finally {
       setLoading(false);

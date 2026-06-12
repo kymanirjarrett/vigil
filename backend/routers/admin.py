@@ -1,11 +1,12 @@
 import uuid as uuid_lib
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from audit import log_action
 from database import get_db
-from models import User
+from models import RefreshToken, User
 from permissions import require_permission
 
 router = APIRouter()
@@ -42,6 +43,39 @@ def unlock_user(
     )
 
     return {"message": "Account unlocked", "user_id": user_id}
+
+
+@router.delete("/users/{user_id}/sessions")
+def revoke_user_sessions(
+    user_id: str,
+    request: Request,
+    current_user: User = Depends(require_permission("users:manage")),
+    db: Session = Depends(get_db),
+):
+    try:
+        uid = uuid_lib.UUID(user_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+
+    target = db.query(User).filter(User.id == uid).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    now = datetime.now(timezone.utc)
+    db.query(RefreshToken).filter(
+        RefreshToken.user_id    == uid,
+        RefreshToken.is_revoked == False,
+    ).update({"is_revoked": True, "revoked_at": now})
+    db.commit()
+
+    log_action(
+        db, "user.sessions_revoked", request,
+        user=current_user,
+        resource_type="user",
+        resource_id=user_id,
+        metadata={"revoked_by": str(current_user.id)},
+    )
+    return {"message": "All sessions revoked", "user_id": user_id}
 
 
 @router.get("/users")
