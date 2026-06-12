@@ -7,16 +7,17 @@ export default function SessionsPage() {
   const [sessions, setSessions] = useState(null);
   const [error, setError]       = useState(null);
   const [revoking, setRevoking] = useState(null);
+  const [tick, setTick]         = useState(0);
 
-  const load = () => {
-    setSessions(null);
-    setError(null);
+  useEffect(() => {
+    let cancelled = false;
     axios.get(`${API}/api/v1/auth/sessions`)
-      .then(res => { setError(null); setSessions(res.data.sessions); })
-      .catch(() => setError("Failed to load sessions."));
-  };
+      .then(res  => { if (!cancelled) { setError(null); setSessions(res.data.sessions); } })
+      .catch(()  => { if (!cancelled) setError("Failed to load sessions."); });
+    return () => { cancelled = true; };
+  }, [tick]);
 
-  useEffect(() => { load(); }, []);
+  const refresh = () => { setSessions(null); setError(null); setTick(t => t + 1); };
 
   const handleRevoke = async (id) => {
     setRevoking(id);
@@ -48,7 +49,7 @@ export default function SessionsPage() {
       <div className="panel">
         <div className="panel-header">
           <span className="panel-title">Your Sessions</span>
-          <button className="btn" onClick={load}>↻ Refresh</button>
+          <button className="btn" onClick={refresh}>↻ Refresh</button>
         </div>
 
         <div className="table-wrap">
