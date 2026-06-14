@@ -9,12 +9,15 @@ from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import AuthEvent, RefreshToken, User
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 ALGORITHM                   = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
@@ -187,6 +190,7 @@ def signup(req: SignupRequest, request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/login")
+@limiter.limit("5/minute")
 def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     email = _normalize_email(req.email)
     user  = db.query(User).filter(User.email == email, User.is_active).first()
