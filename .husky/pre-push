@@ -8,4 +8,10 @@ else
   echo "Warning: ruff not found in backend/venv, skipping backend lint"
 fi
 
+echo "Building frontend..."
+(cd frontend && npm run build)
+
+echo "Auditing frontend dependencies..."
+(cd frontend && npm audit --audit-level=high)
+
 echo "All checks passed."
