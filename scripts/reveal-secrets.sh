@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VAULT="Vigil"
-ITEM="vigil-backend-env"
+ENVIRONMENT="vigil-backend"
 ENV_FILE="backend/.env"
 EXAMPLE_FILE="backend/.env.example"
 
@@ -21,24 +20,12 @@ if ! command -v op &>/dev/null; then
   exit 0
 fi
 
-echo "Pulling secrets from 1Password vault '$VAULT' / item '$ITEM'..."
-
-op read "op://$VAULT/$ITEM/AWS_ACCESS_KEY_ID" > /dev/null 2>&1 || {
-  echo "Error: Could not reach 1Password. Run 'op signin' and try again."
+if ! op whoami &>/dev/null; then
+  echo "Error: 1Password CLI is not signed in."
+  echo "Open the 1Password app → Settings → Developer → enable 'Integrate with 1Password CLI'."
   exit 1
-}
+fi
 
-cat > "$ENV_FILE" <<EOF
-AWS_ACCESS_KEY_ID=$(op read "op://$VAULT/$ITEM/AWS_ACCESS_KEY_ID")
-AWS_SECRET_ACCESS_KEY=$(op read "op://$VAULT/$ITEM/AWS_SECRET_ACCESS_KEY")
-AWS_REGION=$(op read "op://$VAULT/$ITEM/AWS_REGION")
-SENDGRID_API_KEY=$(op read "op://$VAULT/$ITEM/SENDGRID_API_KEY")
-ALERT_SENDER_EMAIL=$(op read "op://$VAULT/$ITEM/ALERT_SENDER_EMAIL")
-DATABASE_URL=$(op read "op://$VAULT/$ITEM/DATABASE_URL")
-VIGIL_JWT_SECRET=$(op read "op://$VAULT/$ITEM/VIGIL_JWT_SECRET")
-VIGIL_ADMIN_EMAIL=$(op read "op://$VAULT/$ITEM/VIGIL_ADMIN_EMAIL")
-VIGIL_ADMIN_PASSWORD=$(op read "op://$VAULT/$ITEM/VIGIL_ADMIN_PASSWORD")
-ALLOWED_ORIGINS=$(op read "op://$VAULT/$ITEM/ALLOWED_ORIGINS")
-EOF
-
-echo "backend/.env written from 1Password."
+echo "Pulling secrets from 1Password environment '$ENVIRONMENT'..."
+op env get "$ENVIRONMENT" > "$ENV_FILE"
+echo "backend/.env written from 1Password Environments."
