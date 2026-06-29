@@ -1,0 +1,287 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  Vigil ETL Monitoring Platform — AWS infrastructure.
+  Provisions S3 buckets, Glue ETL job, Glue Catalog table, Crawler, and IAM roles.
+  Estimated cost per demo ETL run: < $0.01 (Python Shell at 0.0625 DPU × ~30 s).
+  CAPABILITY_NAMED_IAM is required at deploy time (creates named IAM resources).
+
+Parameters:
+  Environment:
+    Type: String
+    Default: nonprod
+    AllowedValues:
+      - nonprod
+      - prod
+    Description: Deployment environment — appended to all resource names.
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Resources
+# ──────────────────────────────────────────────────────────────────────────────
+Resources:
+
+  # ── S3 Buckets ──────────────────────────────────────────────────────────────
+
+  InputBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "vigil-pipeline-input-${AWS::AccountId}-${Environment}"
+      VersioningConfiguration:
+        Status: Enabled
+
+  OutputBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "vigil-pipeline-output-${AWS::AccountId}-${Environment}"
+      VersioningConfiguration:
+        Status: Enabled
+
+  AthenaResultsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "vigil-athena-results-${AWS::AccountId}-${Environment}"
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireQueryResults
+            Status: Enabled
+            ExpirationInDays: 30
+
+  ScriptsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "vigil-glue-scripts-${AWS::AccountId}-${Environment}"
+
+  # ── IAM: Glue service role ───────────────────────────────────────────────────
+
+  GlueServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "vigil-glue-role-${Environment}"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+      Policies:
+        - PolicyName: GlueS3Access
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt InputBucket.Arn
+                  - !Sub "${InputBucket.Arn}/*"
+                  - !GetAtt OutputBucket.Arn
+                  - !Sub "${OutputBucket.Arn}/*"
+                  - !GetAtt ScriptsBucket.Arn
+                  - !Sub "${ScriptsBucket.Arn}/*"
+
+  # ── IAM: vigil-backend read-only user ───────────────────────────────────────
+  # Access keys are created manually after stack deployment — never stored in CFT.
+
+  VigilBackendUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Sub "vigil-backend-${Environment}"
+
+  VigilBackendPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "vigil-backend-readonly-${Environment}"
+      Users:
+        - !Ref VigilBackendUser
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: GlueReadOnly
+            Effect: Allow
+            Action:
+              - glue:GetJob
+              - glue:GetJobs
+              - glue:GetJobRun
+              - glue:GetJobRuns
+              - glue:BatchGetJobs
+              - glue:GetTable
+              - glue:GetTables
+              - glue:GetDatabase
+              - glue:GetDatabases
+            Resource: "*"
+          - Sid: CloudWatchReadOnly
+            Effect: Allow
+            Action:
+              - cloudwatch:GetMetricData
+              - cloudwatch:GetMetricStatistics
+              - cloudwatch:ListMetrics
+            Resource: "*"
+          - Sid: StepFunctionsReadOnly
+            Effect: Allow
+            Action:
+              - states:ListStateMachines
+              - states:ListExecutions
+              - states:DescribeExecution
+            Resource: "*"
+          - Sid: AthenaQueryExecution
+            Effect: Allow
+            Action:
+              - athena:StartQueryExecution
+              - athena:GetQueryExecution
+              - athena:GetQueryResults
+              - athena:StopQueryExecution
+            Resource: "*"
+          - Sid: S3PipelineOutput
+            Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:ListBucket
+            Resource:
+              - !GetAtt OutputBucket.Arn
+              - !Sub "${OutputBucket.Arn}/*"
+          - Sid: S3AthenaResults
+            Effect: Allow
+            Action:
+              - s3:GetBucketLocation
+              - s3:ListBucket
+              - s3:GetObject
+              - s3:PutObject
+            Resource:
+              - !GetAtt AthenaResultsBucket.Arn
+              - !Sub "${AthenaResultsBucket.Arn}/*"
+
+  # ── Glue: database + catalog table ──────────────────────────────────────────
+
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub "vigil_analytics_${Environment}"
+        Description: "Vigil ETL pipeline analytics — Athena-queryable output"
+
+  # Catalog table is declared explicitly so it exists as soon as the stack deploys,
+  # before the crawler ever runs. The health check verifies this table exists.
+  SalesDailyTable:
+    Type: AWS::Glue::Table
+    DependsOn: GlueDatabase
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Sub "vigil_analytics_${Environment}"
+      TableInput:
+        Name: vigil_sales_daily
+        Description: "Daily aggregated sales data produced by vigil-sales-aggregation"
+        TableType: EXTERNAL_TABLE
+        Parameters:
+          classification: parquet
+          "parquet.compression": SNAPPY
+        StorageDescriptor:
+          Location: !Sub "s3://${OutputBucket}/daily/"
+          InputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat
+          SerdeInfo:
+            SerializationLibrary: org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe
+            Parameters:
+              serialization.format: "1"
+          Columns:
+            - Name: date
+              Type: string
+            - Name: total_revenue
+              Type: double
+            - Name: total_quantity
+              Type: bigint
+            - Name: avg_order_value
+              Type: double
+            - Name: transaction_count
+              Type: bigint
+
+  # ── Glue: ETL job ───────────────────────────────────────────────────────────
+  # Python Shell (0.0625 DPU) — cheapest option for a small CSV → Parquet job.
+  # Script is uploaded to ScriptsBucket by the deploy workflow before this runs.
+
+  SalesAggregationJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub "vigil-sales-aggregation-${Environment}"
+      Description: "Reads raw sales CSV, deduplicates, aggregates by day, writes Parquet"
+      Role: !GetAtt GlueServiceRole.Arn
+      Command:
+        Name: pythonshell
+        PythonVersion: "3"
+        ScriptLocation: !Sub "s3://${ScriptsBucket}/sales_aggregation.py"
+      GlueVersion: "3.0"
+      MaxCapacity: 0.0625
+      DefaultArguments:
+        "--INPUT_BUCKET": !Ref InputBucket
+        "--OUTPUT_BUCKET": !Ref OutputBucket
+        "--additional-python-modules": "pandas==2.0.3,pyarrow==14.0.1"
+        "--TempDir": !Sub "s3://${ScriptsBucket}/tmp/"
+      ExecutionProperty:
+        MaxConcurrentRuns: 1
+
+  # ── Glue: crawler ───────────────────────────────────────────────────────────
+  # Updates table statistics after each ETL run. Run manually after job completes.
+
+  SalesCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Sub "vigil-sales-crawler-${Environment}"
+      Role: !GetAtt GlueServiceRole.Arn
+      DatabaseName: !Sub "vigil_analytics_${Environment}"
+      Targets:
+        S3Targets:
+          - Path: !Sub "s3://${OutputBucket}/daily/"
+      SchemaChangePolicy:
+        UpdateBehavior: UPDATE_IN_DATABASE
+        DeleteBehavior: LOG
+      RecrawlPolicy:
+        RecrawlBehavior: CRAWL_EVERYTHING
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Outputs
+# ──────────────────────────────────────────────────────────────────────────────
+Outputs:
+  InputBucketName:
+    Description: "S3 bucket for raw pipeline input data"
+    Value: !Ref InputBucket
+    Export:
+      Name: !Sub "vigil-input-bucket-${Environment}"
+
+  OutputBucketName:
+    Description: "S3 bucket for processed Parquet output"
+    Value: !Ref OutputBucket
+    Export:
+      Name: !Sub "vigil-output-bucket-${Environment}"
+
+  AthenaResultsBucketName:
+    Description: "S3 bucket for Athena query results — set as output location in Athena workgroup"
+    Value: !Ref AthenaResultsBucket
+    Export:
+      Name: !Sub "vigil-athena-results-bucket-${Environment}"
+
+  ScriptsBucketName:
+    Description: "S3 bucket holding Glue job scripts"
+    Value: !Ref ScriptsBucket
+    Export:
+      Name: !Sub "vigil-scripts-bucket-${Environment}"
+
+  GlueDatabaseName:
+    Description: "Glue Catalog database name"
+    Value: !Sub "vigil_analytics_${Environment}"
+    Export:
+      Name: !Sub "vigil-glue-database-${Environment}"
+
+  GlueJobName:
+    Description: "Glue ETL job name"
+    Value: !Ref SalesAggregationJob
+    Export:
+      Name: !Sub "vigil-glue-job-${Environment}"
+
+  VigilBackendUserName:
+    Description: "IAM user for the Vigil backend — create access keys manually via console"
+    Value: !Ref VigilBackendUser
