@@ -1,0 +1,74 @@
+name: Deploy CloudFormation Stack
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        type: choice
+        options:
+          - nonprod
+          - prod
+        required: true
+      action:
+        description: "Stack action"
+        type: choice
+        options:
+          - deploy
+          - delete
+        required: true
+
+jobs:
+  cloudformation:
+    name: "${{ inputs.action }} vigil-${{ inputs.environment }}"
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-2
+
+      - name: Deploy stack
+        if: ${{ inputs.action == 'deploy' }}
+        run: |
+          aws cloudformation deploy \
+            --template-file infra/vigil-stack.yaml \
+            --stack-name vigil-${{ inputs.environment }} \
+            --parameter-overrides Environment=${{ inputs.environment }} \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset
+
+      - name: Upload Glue script and seed data
+        if: ${{ inputs.action == 'deploy' }}
+        run: |
+          AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          ENV="${{ inputs.environment }}"
+
+          SCRIPTS_BUCKET="vigil-glue-scripts-${AWS_ACCOUNT_ID}-${ENV}"
+          INPUT_BUCKET="vigil-pipeline-input-${AWS_ACCOUNT_ID}-${ENV}"
+
+          aws s3 cp infra/glue-scripts/sales_aggregation.py \
+            "s3://${SCRIPTS_BUCKET}/sales_aggregation.py"
+
+          aws s3 cp infra/seed-data/sales_data.csv \
+            "s3://${INPUT_BUCKET}/sales_data.csv"
+
+          echo "Uploaded Glue script to s3://${SCRIPTS_BUCKET}/sales_aggregation.py"
+          echo "Uploaded seed data to s3://${INPUT_BUCKET}/sales_data.csv"
+
+      - name: Delete stack
+        if: ${{ inputs.action == 'delete' }}
+        run: |
+          aws cloudformation delete-stack \
+            --stack-name vigil-${{ inputs.environment }}
+
+          echo "Waiting for stack deletion..."
+          aws cloudformation wait stack-delete-complete \
+            --stack-name vigil-${{ inputs.environment }}
+          echo "Stack vigil-${{ inputs.environment }} deleted."
