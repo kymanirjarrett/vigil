@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from routers import glue, anomalies, alerts, history, auth, mode, audit, auth_events, auth_anomalies, admin, security, totp
+from routers import glue, anomalies, alerts, history, auth, mode, audit, auth_events, auth_anomalies, admin, security, totp, health
 from routers.auth import get_current_user
 from database import engine
 from models import Base
@@ -38,6 +38,7 @@ app.add_middleware(
 )
 
 # Public — no auth required
+app.include_router(health.router, tags=["Health"])
 app.include_router(auth.router,  prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(totp.router,  prefix="/api/v1/auth", tags=["TOTP"])
 
