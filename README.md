@@ -1,177 +1,133 @@
 # Vigil
 
-**Real-time monitoring, anomaly detection, and alerting for AWS Glue ETL pipelines.**
+**ETL observability for AWS Glue: real-time monitoring, anomaly detection, and alerting, on a security foundation built like an internal tool would need.**
 
 [![CI](https://github.com/kymanirjarrett/vigil/actions/workflows/ci.yml/badge.svg)](https://github.com/kymanirjarrett/vigil/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.11-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688)
+![Python](https://img.shields.io/badge/Python-3.11-3776AB)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.139-009688)
 ![React](https://img.shields.io/badge/React-19-61DAFB)
 
----
+**Live demo:** [vigil-three-amber.vercel.app](https://vigil-three-amber.vercel.app/) · **API docs:** [vigil-59y0.onrender.com/docs](https://vigil-59y0.onrender.com/docs)
 
-## Live Demo
-
-**Frontend:** https://vigil-three-amber.vercel.app/
-**API docs:** https://vigil-59y0.onrender.com
-
-> The backend runs on Render's free tier and sleeps after 15 min of inactivity. The first request after a cold start may take ~30 seconds.
+> Sign up to explore as an Analyst in demo mode. The API runs on Render's free tier and sleeps when idle, so the first request after a cold start can take about 30 seconds.
 
 ---
 
-## Problem
+## Why
 
-AWS Glue ETL jobs fail silently. You know something is wrong when a downstream analyst notices stale data or a pipeline SLA is missed — hours after the actual failure. CloudWatch has the data, but building observability tooling on top of it is time-consuming. Vigil wraps that raw AWS data into a focused monitoring surface with anomaly detection and alerting baked in.
-
----
+AWS Glue jobs fail quietly. Usually the first sign is a downstream user noticing stale data, hours after the job actually broke. CloudWatch has the raw signal, but turning it into something a team can watch takes real work. Vigil puts every Glue job on one dashboard, flags runs that look wrong, and emails someone before the failure cascades downstream.
 
 ## Features
 
-- **Live job dashboard** — all Glue jobs in your AWS account, latest status, worker config, last modified
-- **Run history** — per-job execution log with duration bar charts and color-coded status badges
-- **Anomaly detection** — flags duration spikes (>2× the job's mean) and consecutive failure streaks
-- **Email alerting** — one-click anomaly scan + SendGrid alert to any recipient
-- **Persistent history** — all anomaly events and alert sends stored in PostgreSQL via Supabase
-- **JWT authentication** — token-based login protecting all API routes
-- **Docker-ready** — backend ships as a Docker image published to GitHub Container Registry
+**Monitoring**
+- Live dashboard of every Glue job in the account, with latest status and worker configuration
+- Per-job run history with duration charts and status badges
+- Anomaly detection that flags duration spikes (more than 2 standard deviations above the job's mean run time) and consecutive failure streaks
+- One-click anomaly scans with SendGrid email alerts, with every anomaly and alert stored for history
+- Demo mode with realistic sample data, so the app is explorable without AWS access
 
----
+**Security model**
+- **Role-based access control.** Admin and Analyst roles map to granular permissions (`jobs:read`, `alerts:trigger`, `users:manage`, `audit:read`, and more), stored in the database and enforced server-side on every route. Analysts get read-only access by default.
+- **Row-level security on every table.** RLS is enabled in the same Alembic migration that creates each table, with an explicit `service_role` policy, so a new table can't ship without it.
+- **Append-only audit log.** Every significant action is recorded with the user, resource, IP address, and user agent. Rows are never updated or deleted.
+- **Authentication hardening.** bcrypt password hashing, 15-minute JWT access tokens, rotating refresh tokens stored only as SHA-256 hashes, rate-limited login (5 per minute), and account lockout after repeated failures. Reusing a refresh token that was already rotated revokes every session for that user.
+- **Two-factor authentication.** TOTP enrollment with one-time backup codes.
+- **Threat detection.** Every login attempt is recorded, including attempts for emails that don't exist, which is what makes brute force (repeated failures against one account) and credential stuffing (failures spread across many accounts) detectable.
+- **Security posture dashboard.** Hourly login successes and failures, the IPs with the most failures, open threat detections, users by role, and recent admin actions in one view. Users can also see their active sessions and sign any of them out.
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        Browser                              │
-│                React + Vite (Vercel)                        │
-└────────────────────────┬────────────────────────────────────┘
-                         │ HTTPS (Bearer token)
-┌────────────────────────▼────────────────────────────────────┐
-│                   FastAPI (Render)                          │
-│                                                             │
-│   /api/glue ──────────────────────► AWS Glue (boto3)       │
-│   /api/anomalies ─────────────────► detect + persist       │
-│   /api/alerts ────────────────────► SendGrid               │
-│   /api/history ───────────────────► read from DB           │
-│   /api/auth ──────────────────────► JWT issue/verify       │
-└──────────────┬──────────────────────────────────────────────┘
-               │
-┌──────────────▼──────────────────────────────────────────────┐
-│            Supabase (PostgreSQL)                            │
-│   anomaly_events  ·  alert_log                              │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    U[Browser] -->|HTTPS + JWT| FE[React + Vite<br/>Vercel]
+    FE -->|REST| API[FastAPI<br/>Render, Docker]
+    API -->|boto3, read-only IAM| AWS[AWS Glue, Athena, S3]
+    API -->|SQLAlchemy| DB[(PostgreSQL<br/>Supabase, RLS on every table)]
+    API -->|alerts| SG[SendGrid]
+    CF[CloudFormation<br/>infra/vigil-stack.yaml] -.provisions.-> AWS
 ```
 
----
+The API checks permissions on every request through a single `require_permission` dependency, and every write that matters goes through `log_action`, so authorization and auditing live in one place instead of being repeated per route.
 
-## Tech Stack
+### Infrastructure as code
 
-| Layer | Technology | Version |
-|---|---|---|
-| Frontend | React + Vite | 19 / 6 |
-| Charts | Recharts | 2.x |
-| Backend | FastAPI | 0.115 |
-| ORM | SQLAlchemy | 2.0.36 |
-| Database driver | psycopg2-binary | 2.9.9 |
-| AWS SDK | boto3 | 1.35 |
-| Auth | python-jose + passlib | 3.3 / 1.7.4 |
-| Email | SendGrid | 6.11 |
-| Database | PostgreSQL (Supabase) | 16 |
-| Container | Docker + GHCR | — |
-| Backend host | Render (free tier) | — |
-| Frontend host | Vercel (free tier) | — |
+[`infra/vigil-stack.yaml`](infra/vigil-stack.yaml) provisions a real pipeline for Vigil to monitor: S3 buckets for input, output, scripts, and Athena results, a Glue database, table, job, and crawler, a Glue service role, and a read-only IAM policy for the backend. It deploys through a manual GitHub Actions workflow per environment, and `prod` requires an approval from a repository admin. See [`infra/README.md`](infra/README.md).
 
----
+## Tech stack
 
-## Quick Start
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, Vite, React Router, Recharts |
+| Backend | FastAPI, SQLAlchemy 2, Alembic, SlowAPI |
+| Auth | python-jose (JWT), passlib (bcrypt), PyOTP |
+| AWS | boto3 for Glue, Athena, and S3; CloudFormation |
+| Database | PostgreSQL on Supabase |
+| Email | SendGrid |
+| Hosting | Vercel (frontend), Render via Docker (API) |
+| Tooling | GitHub Actions, Husky, secretlint, ESLint, Ruff |
+
+## Engineering practices
+
+- **CI on every push and pull request:** Ruff and a compile check on the backend; ESLint, a production build, and `npm audit` (fails on high severity) on the frontend.
+- **Secret scanning before every commit:** a Husky pre-commit hook runs secretlint on staged files, and a pre-push hook lints both apps.
+- **Migrations only:** every schema change is an Alembic migration, and RLS ships in the same migration as the table.
+- **Issue-driven workflow:** every pull request closes an issue (`Closes #N`).
+
+## Run it locally
 
 ```bash
 git clone https://github.com/kymanirjarrett/vigil.git
 cd vigil
-npm run setup
-npm run reveal-secrets   # creates backend/.env — fill in your values
+npm run setup            # installs both apps and the git hooks
+npm run reveal-secrets   # creates backend/.env from backend/.env.example
 ```
 
-Then in two terminals:
+Fill in `backend/.env`, then run each app in its own terminal:
 
 ```bash
-npm run dev:backend   # terminal 1 — FastAPI on :8000
-npm run dev:frontend  # terminal 2 — Vite on :5173
+npm run dev:backend    # FastAPI on :8000
+npm run dev:frontend   # Vite on :5173
 ```
 
-Open http://localhost:5173 and log in.
+### Environment variables
 
----
-
-## Environment Variables
-
-All variables live in `backend/.env` (created from `backend/.env.example` by `npm run reveal-secrets`).
-
-| Variable | Description |
+| Variable | Purpose |
 |---|---|
-| `AWS_ACCESS_KEY_ID` | IAM user with read-only Glue + CloudWatch access |
-| `AWS_SECRET_ACCESS_KEY` | Corresponding secret |
-| `AWS_REGION` | Target region (e.g. `us-east-2`) |
-| `SENDGRID_API_KEY` | SendGrid API key for alert emails |
-| `ALERT_SENDER_EMAIL` | Verified sender address in SendGrid |
-| `DATABASE_URL` | PostgreSQL connection string (Supabase Session Mode, port 5432) |
-| `JWT_SECRET_KEY` | Random secret for signing JWTs — generate with `openssl rand -hex 32` |
-| `VIGIL_USERNAME` | Login username |
-| `VIGIL_PASSWORD_HASH` | bcrypt hash — generate with `python -c "from passlib.hash import bcrypt; print(bcrypt.hash('yourpass'))"` |
-| `ALLOWED_ORIGINS` | Comma-separated CORS origins (e.g. `https://vigil.vercel.app`) |
+| `DATABASE_URL` | PostgreSQL connection string (Supabase session mode) |
+| `VIGIL_JWT_SECRET` | Secret for signing JWTs (`openssl rand -hex 32`) |
+| `VIGIL_ADMIN_EMAIL`, `VIGIL_ADMIN_PASSWORD` | Seeds the first Admin account |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` | Read-only IAM user for Glue, Athena, and S3 |
+| `GLUE_DATABASE_NAME`, `GLUE_TABLE_NAME`, `ATHENA_RESULTS_BUCKET` | Resources created by the CloudFormation stack |
+| `SENDGRID_API_KEY`, `ALERT_SENDER_EMAIL` | Alert email delivery |
+| `ALLOWED_ORIGINS` | Comma-separated CORS origins |
 
----
-
-## Project Structure
+## Project structure
 
 ```
 vigil/
-├── .github/workflows/
-│   ├── ci.yml              # lint + build on every push/PR
-│   └── docker.yml          # publish Docker image to GHCR on release
-├── .husky/
-│   ├── pre-commit          # secretlint — blocks hardcoded secrets
-│   └── pre-push            # ESLint + ruff before every push
-├── .vscode/                # shared editor settings + extension recommendations
 ├── backend/
-│   ├── routers/            # glue, anomalies, alerts, history, auth
-│   ├── main.py             # FastAPI app, CORS, lifespan
-│   ├── database.py         # SQLAlchemy engine + session factory
-│   ├── models.py           # AnomalyEvent + AlertLog ORM models
-│   ├── aws_client.py       # boto3 Glue client
-│   ├── requirements.txt
-│   ├── Dockerfile
-│   └── .env.example
-├── frontend/
-│   ├── src/
-│   │   ├── components/     # JobsTable, JobRunsPanel, AnomalyBanner, AlertsPanel, HistoryPanel, LoginPage
-│   │   ├── App.jsx         # auth state, global 401 interceptor
-│   │   └── App.css         # design tokens, layout, component styles
-│   ├── index.html
-│   └── .env.example
-├── scripts/
-│   ├── setup.sh            # one-command project setup
-│   ├── dev-backend.sh      # start uvicorn via venv
-│   └── reveal-secrets.sh   # scaffold .env from .env.example
-├── docker-compose.yml      # local container testing
-├── railway.json            # Railway deploy config (alternative to Render)
-├── Makefile                # make setup / dev-backend / dev-frontend
-└── package.json            # root scripts + Husky + lint-staged
+│   ├── routers/          auth, totp, admin, glue, anomalies, alerts, history,
+│   │                     audit, auth_events, auth_anomalies, security, mode, health
+│   ├── alembic/          migrations (RLS enabled per table)
+│   ├── permissions.py    RBAC: role to permission mapping and require_permission
+│   ├── audit.py          append-only audit logging
+│   ├── auth_detection.py brute force and credential stuffing detection
+│   └── main.py
+├── frontend/src/components/   dashboard, admin, audit, security, and account pages
+├── infra/                     CloudFormation stack, Glue script, seed data
+├── .github/workflows/         CI, CloudFormation deploy, database keep-alive
+└── .husky/                    pre-commit secret scan, pre-push lint
 ```
-
----
 
 ## Roadmap
 
-- [ ] CloudWatch integration (Lambda error rates, Glue metrics tab)
-- [ ] Auto-polling with real 60s refresh behind the LIVE indicator
-- [ ] Slack alerting
-- [ ] Anomaly sensitivity controls
-- [ ] Historical trend charts
-- [ ] Step Functions monitoring
-- [ ] Monorepo restructure (`packages/` layout)
-
----
+- Backend and frontend test suites, run in CI
+- Keyless AWS authentication for the deploy workflow through GitHub OIDC
+- CloudWatch metrics for Lambda and Glue
+- Slack alerting and per-job anomaly sensitivity
+- Step Functions monitoring
 
 ## License
 
-MIT © 2025 Kymani Jarrett
+[MIT](LICENSE) © 2026 Kymani Jarrett
