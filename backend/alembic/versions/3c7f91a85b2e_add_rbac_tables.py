@@ -18,44 +18,52 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.create_table(
-        "roles",
-        sa.Column("id",          sa.UUID(),    nullable=False),
-        sa.Column("name",        sa.String(),  nullable=False),
-        sa.Column("description", sa.String(),  nullable=True),
-        sa.Column("created_at",  sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True),
-        sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("name"),
-    )
-    op.create_index("ix_roles_name", "roles", ["name"], unique=True)
+    # Tolerate tables that Base.metadata.create_all() made before this migration
+    # ran (production hit this). Alembic owns the schema from here on.
+    existing = set(sa.inspect(op.get_bind()).get_table_names())
 
-    op.create_table(
-        "permissions",
-        sa.Column("id",         sa.UUID(),   nullable=False),
-        sa.Column("name",       sa.String(), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True),
-        sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("name"),
-    )
-    op.create_index("ix_permissions_name", "permissions", ["name"], unique=True)
+    if "roles" not in existing:
+        op.create_table(
+            "roles",
+            sa.Column("id",          sa.UUID(),    nullable=False),
+            sa.Column("name",        sa.String(),  nullable=False),
+            sa.Column("description", sa.String(),  nullable=True),
+            sa.Column("created_at",  sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True),
+            sa.PrimaryKeyConstraint("id"),
+            sa.UniqueConstraint("name"),
+        )
+    op.create_index("ix_roles_name", "roles", ["name"], unique=True, if_not_exists=True)
 
-    op.create_table(
-        "role_permissions",
-        sa.Column("id",            sa.UUID(), nullable=False),
-        sa.Column("role_id",       sa.UUID(), nullable=False),
-        sa.Column("permission_id", sa.UUID(), nullable=False),
-        sa.Column("created_at",    sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True),
-        sa.ForeignKeyConstraint(["role_id"],       ["roles.id"],       ondelete="CASCADE"),
-        sa.ForeignKeyConstraint(["permission_id"], ["permissions.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("role_id", "permission_id", name="uq_role_permission"),
-    )
-    op.create_index("ix_role_permissions_role_id",       "role_permissions", ["role_id"])
-    op.create_index("ix_role_permissions_permission_id", "role_permissions", ["permission_id"])
+    if "permissions" not in existing:
+        op.create_table(
+            "permissions",
+            sa.Column("id",         sa.UUID(),   nullable=False),
+            sa.Column("name",       sa.String(), nullable=False),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True),
+            sa.PrimaryKeyConstraint("id"),
+            sa.UniqueConstraint("name"),
+        )
+    op.create_index("ix_permissions_name", "permissions", ["name"], unique=True, if_not_exists=True)
+
+    if "role_permissions" not in existing:
+        op.create_table(
+            "role_permissions",
+            sa.Column("id",            sa.UUID(), nullable=False),
+            sa.Column("role_id",       sa.UUID(), nullable=False),
+            sa.Column("permission_id", sa.UUID(), nullable=False),
+            sa.Column("created_at",    sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True),
+            sa.ForeignKeyConstraint(["role_id"],       ["roles.id"],       ondelete="CASCADE"),
+            sa.ForeignKeyConstraint(["permission_id"], ["permissions.id"], ondelete="CASCADE"),
+            sa.PrimaryKeyConstraint("id"),
+            sa.UniqueConstraint("role_id", "permission_id", name="uq_role_permission"),
+        )
+    op.create_index("ix_role_permissions_role_id",       "role_permissions", ["role_id"], if_not_exists=True)
+    op.create_index("ix_role_permissions_permission_id", "role_permissions", ["permission_id"], if_not_exists=True)
 
     # RLS
     for table in ("roles", "permissions", "role_permissions"):
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;")
+        op.execute(f'DROP POLICY IF EXISTS "service_role_all" ON {table};')
         op.execute(f"""
             CREATE POLICY "service_role_all" ON {table}
             FOR ALL TO service_role
@@ -66,7 +74,8 @@ def upgrade() -> None:
     op.execute("""
         INSERT INTO roles (id, name, description) VALUES
         (gen_random_uuid(), 'admin',   'Full platform access'),
-        (gen_random_uuid(), 'analyst', 'Read-only access to monitoring data');
+        (gen_random_uuid(), 'analyst', 'Read-only access to monitoring data')
+        ON CONFLICT (name) DO NOTHING;
     """)
 
     # Seed permissions
@@ -81,7 +90,8 @@ def upgrade() -> None:
         (gen_random_uuid(), 'users:manage'),
         (gen_random_uuid(), 'audit:read'),
         (gen_random_uuid(), 'security:read'),
-        (gen_random_uuid(), 'mode:toggle');
+        (gen_random_uuid(), 'mode:toggle')
+        ON CONFLICT (name) DO NOTHING;
     """)
 
     # Grant all permissions to admin
@@ -90,7 +100,8 @@ def upgrade() -> None:
         SELECT gen_random_uuid(), r.id, p.id
         FROM roles r
         CROSS JOIN permissions p
-        WHERE r.name = 'admin';
+        WHERE r.name = 'admin'
+        ON CONFLICT (role_id, permission_id) DO NOTHING;
     """)
 
     # Grant subset to analyst
@@ -99,7 +110,8 @@ def upgrade() -> None:
         SELECT gen_random_uuid(), r.id, p.id
         FROM roles r
         JOIN permissions p ON p.name IN ('jobs:read', 'alerts:read', 'anomalies:read')
-        WHERE r.name = 'analyst';
+        WHERE r.name = 'analyst'
+        ON CONFLICT (role_id, permission_id) DO NOTHING;
     """)
 
 

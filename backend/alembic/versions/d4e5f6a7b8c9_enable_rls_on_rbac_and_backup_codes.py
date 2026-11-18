@@ -19,6 +19,9 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     for table in ("roles", "permissions", "role_permissions", "backup_codes"):
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;")
+        # Earlier migrations already create this policy; drop first so the
+        # chain applies cleanly to a fresh database.
+        op.execute(f'DROP POLICY IF EXISTS "service_role_all" ON {table};')
         op.execute(f"""
             CREATE POLICY "service_role_all" ON {table}
             FOR ALL TO service_role

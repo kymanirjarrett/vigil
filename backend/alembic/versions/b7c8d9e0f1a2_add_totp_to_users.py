@@ -18,23 +18,32 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("users", sa.Column("totp_secret",  sa.String(),  nullable=True))
-    op.add_column("users", sa.Column("totp_enabled", sa.Boolean(), nullable=False, server_default="false"))
+    # Tolerate a backup_codes table made by Base.metadata.create_all() before
+    # this migration ran (production hit this).
+    inspector = sa.inspect(op.get_bind())
+    user_cols = {c["name"] for c in inspector.get_columns("users")}
 
-    op.create_table(
-        "backup_codes",
-        sa.Column("id",         sa.UUID(),                  nullable=False),
-        sa.Column("user_id",    sa.UUID(),                  nullable=False),
-        sa.Column("code_hash",  sa.String(),                nullable=False),
-        sa.Column("used",       sa.Boolean(),               nullable=False, server_default="false"),
-        sa.Column("used_at",    sa.DateTime(timezone=True), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("id"),
-    )
-    op.create_index("ix_backup_codes_user_id", "backup_codes", ["user_id"])
+    if "totp_secret" not in user_cols:
+        op.add_column("users", sa.Column("totp_secret", sa.String(), nullable=True))
+    if "totp_enabled" not in user_cols:
+        op.add_column("users", sa.Column("totp_enabled", sa.Boolean(), nullable=False, server_default="false"))
+
+    if not inspector.has_table("backup_codes"):
+        op.create_table(
+            "backup_codes",
+            sa.Column("id",         sa.UUID(),                  nullable=False),
+            sa.Column("user_id",    sa.UUID(),                  nullable=False),
+            sa.Column("code_hash",  sa.String(),                nullable=False),
+            sa.Column("used",       sa.Boolean(),               nullable=False, server_default="false"),
+            sa.Column("used_at",    sa.DateTime(timezone=True), nullable=True),
+            sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=True),
+            sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
+            sa.PrimaryKeyConstraint("id"),
+        )
+    op.create_index("ix_backup_codes_user_id", "backup_codes", ["user_id"], if_not_exists=True)
 
     op.execute("ALTER TABLE backup_codes ENABLE ROW LEVEL SECURITY;")
+    op.execute('DROP POLICY IF EXISTS "service_role_all" ON backup_codes;')
     op.execute("""
         CREATE POLICY "service_role_all" ON backup_codes
         FOR ALL TO service_role
