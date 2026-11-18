@@ -1,5 +1,4 @@
 import os
-from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -7,23 +6,18 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from routers import glue, anomalies, alerts, history, auth, mode, audit, auth_events, auth_anomalies, admin, security, totp, health
 from routers.auth import get_current_user
-from database import engine
-from models import Base
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
-    yield
-
+# Schema is owned by Alembic and applied by start.sh before the server boots.
+# Do not call Base.metadata.create_all() here: it creates tables without RLS,
+# policies, or seed data, and it cannot add columns to existing tables.
 
 app = FastAPI(
     title="Vigil API",
     description="ETL Monitoring & Observability Platform",
     version="1.0.0",
-    lifespan=lifespan,
 )
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

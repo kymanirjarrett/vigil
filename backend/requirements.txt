@@ -6,7 +6,6 @@ sendgrid==6.12.5
 sqlalchemy==2.0.51
 psycopg2-binary==2.9.12
 python-jose[cryptography]==3.5.0
-passlib[bcrypt]==1.7.4
 bcrypt==5.0.0
 python-multipart==0.0.32
 alembic==1.18.5

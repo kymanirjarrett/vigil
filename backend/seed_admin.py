@@ -10,9 +10,9 @@ Requires:
 """
 import os
 from dotenv import load_dotenv
-from passlib.context import CryptContext
 from database import SessionLocal
 from models import User
+from passwords import hash_password
 
 load_dotenv()
 
@@ -23,8 +23,7 @@ plaintext = os.getenv("VIGIL_ADMIN_PASSWORD")
 if not existing_hash and not plaintext:
     raise SystemExit("Set VIGIL_ADMIN_PASSWORD or VIGIL_PASSWORD_HASH in .env")
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-password_hash = existing_hash if existing_hash else pwd_context.hash(plaintext)
+password_hash = existing_hash if existing_hash else hash_password(plaintext)
 
 db = SessionLocal()
 try:
