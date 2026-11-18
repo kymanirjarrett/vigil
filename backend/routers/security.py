@@ -7,15 +7,16 @@ from sqlalchemy.orm import Session
 
 from auth_detection import detect_auth_anomalies
 from database import get_db
-from demo_data import get_demo_security_posture
+from security_seed import get_seed_security_posture
 from models import AuditLogEntry, AuthEvent, User
 from permissions import require_permission
 
 router = APIRouter()
 
 
-def _use_demo(user: User) -> bool:
-    return user.role == "analyst" or user.demo_mode
+def _use_sample(user: User) -> bool:
+    # The shared guest account only ever sees synthetic security data.
+    return user.role == "guest"
 
 
 @router.get("/posture")
@@ -23,8 +24,8 @@ def get_security_posture(
     current_user: User = Depends(require_permission("security:read")),
     db: Session = Depends(get_db),
 ):
-    if _use_demo(current_user):
-        return get_demo_security_posture()
+    if _use_sample(current_user):
+        return get_seed_security_posture()
 
     now       = datetime.now(timezone.utc)
     since_24h = now - timedelta(hours=24)

@@ -78,7 +78,6 @@ export default function AuditLogPage() {
             <option value="user.login">user.login</option>
             <option value="user.signup">user.signup</option>
             <option value="alert.triggered">alert.triggered</option>
-            <option value="mode.toggled">mode.toggled</option>
           </select>
           <button className="btn" onClick={() => { setEntries(null); setRefreshTick(t => t + 1); }}>
             ↻ Refresh

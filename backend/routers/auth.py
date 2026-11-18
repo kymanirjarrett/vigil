@@ -66,7 +66,6 @@ def _user_dict(user: User) -> dict:
         "id":       str(user.id),
         "email":    user.email,
         "role":     user.role,
-        "demo_mode": user.demo_mode,
     }
 
 
@@ -170,7 +169,6 @@ def signup(req: SignupRequest, request: Request, db: Session = Depends(get_db)):
         email         = email,
         password_hash = hash_password(req.password),
         role          = "analyst",
-        demo_mode     = True,
     )
     db.add(user)
     db.commit()

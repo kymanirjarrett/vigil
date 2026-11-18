@@ -10,6 +10,12 @@ const SEVERITY_STYLE = {
   warning: { background: "rgba(245,166,35,0.15)", color: "var(--warn)" },
 };
 
+function deliveryStyle(alert) {
+  if (alert.simulated) return { background: "rgba(90,95,114,0.2)", color: "var(--muted)" };
+  if (alert.sendgrid_status === 202) return { background: "rgba(0,229,160,0.1)", color: "var(--accent)" };
+  return { background: "rgba(255,71,87,0.12)", color: "var(--danger)" };
+}
+
 export default function HistoryPanel() {
   const [tab, setTab] = useState(TABS.ANOMALIES);
   const [anomalies, setAnomalies] = useState([]);
@@ -222,7 +228,7 @@ export default function HistoryPanel() {
                   <th>Recipient</th>
                   <th>Job</th>
                   <th>Anomalies</th>
-                  <th>SendGrid Status</th>
+                  <th>Delivery</th>
                 </tr>
               </thead>
               <tbody>
@@ -240,17 +246,10 @@ export default function HistoryPanel() {
                           fontSize: "0.68rem",
                           padding: "2px 8px",
                           borderRadius: "3px",
-                          background:
-                            a.sendgrid_status === 202
-                              ? "rgba(0,229,160,0.1)"
-                              : "rgba(255,71,87,0.12)",
-                          color:
-                            a.sendgrid_status === 202
-                              ? "var(--accent)"
-                              : "var(--danger)",
+                          ...deliveryStyle(a),
                         }}
                       >
-                        {a.sendgrid_status ?? "—"}
+                        {a.simulated ? "simulated" : (a.sendgrid_status ?? "—")}
                       </span>
                     </td>
                   </tr>

@@ -148,7 +148,6 @@ def list_users(
                 "email":        u.email,
                 "role":         u.role,
                 "is_active":    u.is_active,
-                "demo_mode":    u.demo_mode,
                 "locked_until": u.locked_until.isoformat() if u.locked_until else None,
                 "created_at":   u.created_at.isoformat() if u.created_at else None,
                 "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,

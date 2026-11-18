@@ -150,7 +150,7 @@ export default function ThreatDetectionPage() {
           <div style={{ padding: "0.6rem 1.25rem", borderTop: "1px solid var(--border)", fontSize: "0.67rem", color: "var(--muted)", display: "flex", gap: "1rem" }}>
             <span>Source: <span style={{ color: data.source === "live" ? "var(--accent)" : "var(--warn)" }}>{data.source}</span></span>
             <span>Window: {data.lookback_hours}h</span>
-            {data.source === "demo" && <span style={{ color: "var(--warn)" }}>Demo data — engineered scenarios</span>}
+            {data.source === "sample" && <span style={{ color: "var(--warn)" }}>Sample data: engineered scenarios</span>}
           </div>
         )}
       </div>

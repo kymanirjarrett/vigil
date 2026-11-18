@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
 import axios from "axios";
 
@@ -15,26 +15,17 @@ const NAV_ITEMS = [
   { to: "/app/audit",       label: "Audit Log",        icon: "⊕", roles: ["admin"] },
 ];
 
-export default function AppShell({ user, onLogout, onUserUpdate }) {
-  const [modeKey, setModeKey]     = useState(0);
-  const [toggling, setToggling]   = useState(false);
-  const [collapsed, setCollapsed] = useState(false);
+export default function AppShell({ user, onLogout }) {
+  const [collapsed, setCollapsed]   = useState(false);
+  const [dataSource, setDataSource] = useState(null);
 
-  const isDemo    = user?.role === "analyst" || user?.demo_mode;
-  const canToggle = user?.role === "admin";
-
-  const handleModeToggle = async () => {
-    setToggling(true);
-    try {
-      const res = await axios.post(`${API}/api/v1/mode/toggle`);
-      onUserUpdate({ ...user, demo_mode: res.data.demo_mode });
-      setModeKey(k => k + 1);
-    } catch (e) {
-      console.error("Mode toggle failed", e);
-    } finally {
-      setToggling(false);
-    }
-  };
+  useEffect(() => {
+    let cancelled = false;
+    axios.get(`${API}/health`)
+      .then(res => { if (!cancelled) setDataSource(res.data.data_source); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
 
   const visibleNav = NAV_ITEMS.filter(n => n.roles.includes(user?.role));
 
@@ -70,28 +61,12 @@ export default function AppShell({ user, onLogout, onUserUpdate }) {
           ))}
         </nav>
 
-        {/* Footer: mode toggle, user info, sign out */}
+        {/* Footer: data source label, user info, sign out */}
         <div className="sidebar-footer">
-          {canToggle ? (
-            <button
-              className="sidebar-mode-btn"
-              onClick={handleModeToggle}
-              disabled={toggling}
-              style={{
-                borderColor: isDemo ? "var(--warn)" : "var(--accent)",
-                color: isDemo ? "var(--warn)" : "var(--accent)",
-              }}
-              title={isDemo ? "Switch to Live" : "Switch to Demo"}
-            >
-              <span className="pulse" style={{ background: isDemo ? "var(--warn)" : undefined }} />
-              {!collapsed && (
-                <span>{toggling ? "…" : isDemo ? "DEMO — switch to LIVE" : "LIVE — switch to DEMO"}</span>
-              )}
-            </button>
-          ) : (
-            <div className="sidebar-mode-demo">
-              <span className="pulse" style={{ background: "var(--warn)" }} />
-              {!collapsed && <span>DEMO MODE</span>}
+          {dataSource === "seed" && (
+            <div className="sidebar-data-label" title="This app runs on generated sample pipeline data">
+              <span className="sidebar-data-dot" aria-hidden="true" />
+              {!collapsed && <span className="sidebar-data-text">Sample data</span>}
             </div>
           )}
 
@@ -114,7 +89,7 @@ export default function AppShell({ user, onLogout, onUserUpdate }) {
       </aside>
 
       <main className="shell-main">
-        <Outlet context={{ user, modeKey }} />
+        <Outlet context={{ user }} />
       </main>
     </div>
   );
