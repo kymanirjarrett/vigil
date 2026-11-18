@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import TryDemoButton from "./TryDemoButton";
 
 const FEATURES = [
   {
@@ -53,7 +54,7 @@ const STEPS = [
   },
 ];
 
-export default function LandingPage() {
+export default function LandingPage({ onLogin }) {
   return (
     <div className="landing">
       {/* ── Nav ── */}
@@ -68,7 +69,7 @@ export default function LandingPage() {
         </div>
         <div className="landing-nav-actions">
           <Link to="/login" className="landing-btn-ghost">Log in</Link>
-          <Link to="/signup" className="landing-btn-primary">Sign up</Link>
+          <TryDemoButton onLogin={onLogin} className="landing-btn-primary" />
         </div>
       </nav>
 
@@ -88,14 +89,14 @@ export default function LandingPage() {
             and instant alerting — built for the ops engineers who own the pipeline.
           </p>
           <div className="landing-ctas">
-            <Link to="/signup" className="landing-btn-primary landing-btn-lg">
-              Get started →
-            </Link>
+            <TryDemoButton onLogin={onLogin} className="landing-btn-primary landing-btn-lg">
+              Try the demo →
+            </TryDemoButton>
             <Link to="/signup" className="landing-btn-ghost landing-btn-lg">
-              View demo
+              Create an account
             </Link>
           </div>
-          <p className="landing-cta-hint">Free to use · No credit card required</p>
+          <p className="landing-cta-hint">One click, read-only, runs on sample pipeline data</p>
         </div>
 
         {/* Terminal-style preview card */}
@@ -167,9 +168,9 @@ export default function LandingPage() {
       {/* ── CTA band ── */}
       <section className="landing-cta-band">
         <h2 className="landing-cta-band-title">Ready to see your pipeline clearly?</h2>
-        <Link to="/signup" className="landing-btn-primary landing-btn-lg">
-          Create free account →
-        </Link>
+        <TryDemoButton onLogin={onLogin} className="landing-btn-primary landing-btn-lg">
+          Try the demo →
+        </TryDemoButton>
       </section>
 
       {/* ── Footer ── */}
@@ -189,6 +190,7 @@ export default function LandingPage() {
           </a>
           <Link to="/login">Log in</Link>
           <Link to="/signup">Sign up</Link>
+          <TryDemoButton onLogin={onLogin} className="landing-footer-demo" />
         </div>
         <p className="landing-footer-copy">
           © {new Date().getFullYear()} Vigil. Built by Kymani Jarrett.

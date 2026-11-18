@@ -275,6 +275,46 @@ tbody tr.selected td { color: var(--accent); }
 .login-btn:hover:not(:disabled) { background: rgba(0,229,160,0.15); }
 .login-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0.75rem 0 0.25rem;
+  font-size: 0.65rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.login-divider::before,
+.login-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border2);
+}
+
+.login-btn-demo {
+  width: 100%;
+  border-color: var(--border2);
+  background: transparent;
+  color: var(--text);
+}
+.login-btn-demo:hover:not(:disabled) { border-color: var(--accent); background: rgba(0,229,160,0.06); }
+
+.login-demo-hint {
+  margin-top: 0.5rem;
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.try-demo-error {
+  display: block;
+  margin-top: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--danger);
+}
+
 /* ══════════════════════════════════════════════
    LANDING PAGE
    ══════════════════════════════════════════════ */
@@ -665,6 +705,18 @@ tbody tr.selected td { color: var(--accent); }
   gap: 1.5rem;
 }
 
+.landing-footer-demo {
+  font-family: inherit;
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.landing-footer-demo:hover { color: var(--text); }
+
 .landing-footer-links a {
   font-size: 0.72rem;
   color: var(--muted);
@@ -906,4 +958,14 @@ tbody tr.selected td { color: var(--accent); }
 
   .sidebar-data-text,
   .sidebar-signout .sidebar-link-label { display: none; }
+}
+
+.sample-note {
+  margin-bottom: 1rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid var(--border2);
+  border-left: 2px solid var(--warn);
+  border-radius: 4px;
+  font-size: 0.72rem;
+  color: var(--muted);
 }

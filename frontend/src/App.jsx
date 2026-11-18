@@ -102,7 +102,7 @@ function AccountRoute({ user }) {
     <>
       <div className="page-title">
         <h1>Account</h1>
-        <p>Manage your profile and two-factor authentication</p>
+        <p>{user?.role === "guest" ? "Shared demo account" : "Manage your profile and two-factor authentication"}</p>
       </div>
       <AccountPage user={user} />
     </>
@@ -120,6 +120,9 @@ function SessionsRoute() {
     </>
   );
 }
+
+// Guests see the security pages, which serve them sample data server-side.
+const canViewSecurity = (user) => user?.role === "admin" || user?.role === "guest";
 
 export default function App() {
   const [token, setToken] = useState(_stored);
@@ -222,7 +225,9 @@ export default function App() {
 
   const handleLogout = () => {
     // Best-effort server-side revocation; don't wait for it
-    axios.post(`${API}/api/v1/auth/logout`).catch(() => {});
+    // Send this device's refresh token so only this session chain is revoked.
+    const refreshToken = localStorage.getItem("vigil_refresh_token");
+    axios.post(`${API}/api/v1/auth/logout`, { refresh_token: refreshToken }).catch(() => {});
     doLogout();
   };
 
@@ -230,7 +235,7 @@ export default function App() {
     <Routes>
       <Route
         path="/"
-        element={token ? <Navigate to="/app/dashboard" replace /> : <LandingPage />}
+        element={token ? <Navigate to="/app/dashboard" replace /> : <LandingPage onLogin={handleLogin} />}
       />
       <Route
         path="/login"
@@ -251,7 +256,10 @@ export default function App() {
       >
         <Route index element={<Navigate to="dashboard" replace />} />
         <Route path="dashboard" element={<DashboardView />} />
-        <Route path="sessions"  element={<SessionsRoute />} />
+        <Route
+          path="sessions"
+          element={user?.role === "guest" ? <Navigate to="/app/dashboard" replace /> : <SessionsRoute />}
+        />
         <Route
           path="admin/users"
           element={user?.role === "admin" ? <AdminUsersRoute user={user} /> : <Navigate to="/app/dashboard" replace />}
@@ -262,19 +270,19 @@ export default function App() {
         />
         <Route
           path="posture"
-          element={user?.role === "admin" ? <SecurityPostureRoute /> : <Navigate to="/app/dashboard" replace />}
+          element={canViewSecurity(user) ? <SecurityPostureRoute /> : <Navigate to="/app/dashboard" replace />}
         />
         <Route
           path="threats"
-          element={user?.role === "admin" ? <ThreatDetectionRoute /> : <Navigate to="/app/dashboard" replace />}
+          element={canViewSecurity(user) ? <ThreatDetectionRoute /> : <Navigate to="/app/dashboard" replace />}
         />
         <Route
           path="security"
-          element={user?.role === "admin" ? <SecurityRoute /> : <Navigate to="/app/dashboard" replace />}
+          element={canViewSecurity(user) ? <SecurityRoute /> : <Navigate to="/app/dashboard" replace />}
         />
         <Route
           path="audit"
-          element={user?.role === "admin" ? <AuditRoute /> : <Navigate to="/app/dashboard" replace />}
+          element={canViewSecurity(user) ? <AuditRoute /> : <Navigate to="/app/dashboard" replace />}
         />
         <Route path="account" element={<AccountRoute user={user} />} />
       </Route>

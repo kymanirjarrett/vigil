@@ -102,7 +102,7 @@ export default function AlertsPanel({ jobName, user }) {
               className="btn"
               onClick={triggerAlert}
               disabled={!jobName || !canTrigger || !email || status === "sending"}
-              title={!canTrigger ? "Analysts cannot trigger live alerts — read-only access" : undefined}
+              title={!canTrigger ? "Your role has read-only access to alerts" : undefined}
               style={{
                 borderColor: canTrigger && jobName ? "var(--accent)" : "var(--border2)",
                 color:        canTrigger && jobName ? "var(--accent)" : "var(--muted)",
@@ -117,7 +117,7 @@ export default function AlertsPanel({ jobName, user }) {
 
           {!canTrigger && (
             <span style={{ fontSize: "0.72rem", color: "var(--muted)", fontStyle: "italic" }}>
-              Analysts can view alerts but cannot trigger them.
+              Your role can view alerts but cannot trigger them.
             </span>
           )}
 

@@ -29,6 +29,7 @@ export default function SecurityEventsPage() {
   const [page, setPage]                 = useState(1);
   const [filterType, setFilterType]     = useState("");
   const [refreshTick, setRefreshTick]   = useState(0);
+  const [source, setSource]           = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,6 +41,7 @@ export default function SecurityEventsPage() {
         if (cancelled) return;
         setFetchError(null);
         setEvents(res.data.events);
+        setSource(res.data.source);
         setTotal(res.data.total);
       })
       .catch(() => {
@@ -63,6 +65,11 @@ export default function SecurityEventsPage() {
 
   return (
     <div>
+      {source === "sample" && (
+        <div className="sample-note">
+          Sample data: synthetic events with masked IPs. Real security events are only shown to admins.
+        </div>
+      )}
       {/* Summary cards */}
       {events && (
         <div style={{ display: "flex", gap: "1rem", marginBottom: "1.5rem" }}>

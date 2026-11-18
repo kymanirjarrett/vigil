@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
+import TryDemoButton from "./TryDemoButton";
 
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
-function CredentialsStep({ onSuccess }) {
+function CredentialsStep({ onSuccess, onDemo }) {
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [error, setError]       = useState(null);
@@ -67,6 +68,10 @@ function CredentialsStep({ onSuccess }) {
       <button className="login-btn" type="submit" disabled={loading}>
         {loading ? "Signing in…" : "Sign in"}
       </button>
+
+      <div className="login-divider"><span>or</span></div>
+      <TryDemoButton onLogin={onDemo} className="login-btn login-btn-demo" />
+      <p className="login-demo-hint">Read-only access to sample pipeline data. No account needed.</p>
 
       <p style={{ textAlign: "center", fontSize: "0.72rem", color: "var(--muted)", marginTop: "1rem" }}>
         Don't have an account?{" "}
@@ -168,7 +173,7 @@ export default function LoginPage({ onLogin }) {
     <div className="login-backdrop">
       {tempToken
         ? <TotpStep tempToken={tempToken} onSuccess={handleTotp} onBack={() => setTempToken(null)} />
-        : <CredentialsStep onSuccess={handleCredentials} />
+        : <CredentialsStep onSuccess={handleCredentials} onDemo={onLogin} />
       }
     </div>
   );

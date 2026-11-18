@@ -31,6 +31,7 @@ export default function AuditLogPage() {
   const [page, setPage]                 = useState(1);
   const [filterAction, setFilterAction] = useState("");
   const [refreshTick, setRefreshTick]   = useState(0);
+  const [source, setSource]           = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -42,6 +43,7 @@ export default function AuditLogPage() {
         if (cancelled) return;
         setFetchError(null);
         setEntries(res.data.entries);
+        setSource(res.data.source);
         setTotal(res.data.total);
       })
       .catch(() => {
@@ -62,6 +64,11 @@ export default function AuditLogPage() {
 
   return (
     <div className="panel">
+      {source === "sample" && (
+        <div className="sample-note">
+          Sample data: synthetic events with masked IPs. Real security events are only shown to admins.
+        </div>
+      )}
       <div className="panel-header">
         <span className="panel-title">Audit Log</span>
         <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
