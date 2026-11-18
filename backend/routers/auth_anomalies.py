@@ -5,15 +5,16 @@ from sqlalchemy.orm import Session
 
 from auth_detection import detect_auth_anomalies
 from database import get_db
-from demo_data import get_demo_auth_anomalies
+from security_seed import get_seed_auth_anomalies
 from models import AuthEvent, User
 from permissions import require_permission
 
 router = APIRouter()
 
 
-def _use_demo(user: User) -> bool:
-    return user.role == "analyst" or user.demo_mode
+def _use_sample(user: User) -> bool:
+    # The shared guest account only ever sees synthetic security data.
+    return user.role == "guest"
 
 
 @router.get("")
@@ -22,13 +23,13 @@ def get_auth_anomalies(
     current_user: User = Depends(require_permission("security:read")),
     db: Session = Depends(get_db),
 ):
-    if _use_demo(current_user):
-        anomalies = get_demo_auth_anomalies()
+    if _use_sample(current_user):
+        anomalies = get_seed_auth_anomalies()
         return {
             "anomaly_count": len(anomalies),
             "anomalies":     anomalies,
             "lookback_hours": lookback_hours,
-            "source":        "demo",
+            "source":        "sample",
         }
 
     since = datetime.now(timezone.utc) - timedelta(hours=lookback_hours)
