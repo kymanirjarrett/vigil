@@ -7,7 +7,6 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -15,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import AuthEvent, RefreshToken, User
+from passwords import MAX_PASSWORD_BYTES, hash_password, verify_password
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -25,7 +25,6 @@ REFRESH_TOKEN_EXPIRE_DAYS   = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS",   "7"))
 MAX_LOGIN_ATTEMPTS          = int(os.getenv("MAX_LOGIN_ATTEMPTS",           "5"))
 LOCKOUT_MINUTES             = int(os.getenv("LOCKOUT_MINUTES",              "15"))
 
-pwd_context   = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 
@@ -159,6 +158,8 @@ class RefreshRequest(BaseModel):
 def signup(req: SignupRequest, request: Request, db: Session = Depends(get_db)):
     if len(req.password) < 8:
         raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    if len(req.password.encode("utf-8")) > MAX_PASSWORD_BYTES:
+        raise HTTPException(status_code=400, detail="Password must be at most 72 bytes")
 
     email    = _normalize_email(req.email)
     existing = db.query(User).filter(User.email == email).first()
@@ -167,7 +168,7 @@ def signup(req: SignupRequest, request: Request, db: Session = Depends(get_db)):
 
     user = User(
         email         = email,
-        password_hash = pwd_context.hash(req.password),
+        password_hash = hash_password(req.password),
         role          = "analyst",
         demo_mode     = True,
     )
@@ -205,7 +206,7 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
             detail="Too many login attempts, please try again later",
         )
 
-    if not user or not pwd_context.verify(req.password, user.password_hash):
+    if not user or not verify_password(req.password, user.password_hash):
         _record_auth_event(db, request, "login_failure", email, user)
 
         if user and user.role != "admin":
