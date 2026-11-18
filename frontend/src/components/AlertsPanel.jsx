@@ -6,7 +6,7 @@ const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 const ANALYST_PERMISSIONS = new Set(["jobs:read", "alerts:read", "anomalies:read"]);
 const ADMIN_PERMISSIONS   = new Set([
   "jobs:read", "jobs:read:live", "alerts:read", "alerts:trigger",
-  "anomalies:read", "users:read", "users:manage", "audit:read", "mode:toggle",
+  "anomalies:read", "users:read", "users:manage", "audit:read", "security:read",
 ]);
 
 function userPermissions(user) {
@@ -15,7 +15,7 @@ function userPermissions(user) {
 }
 
 export default function AlertsPanel({ jobName, user }) {
-  const [email, setEmail]     = useState("jarretkr@mail.uc.edu");
+  const [email, setEmail]     = useState("");
   const [status, setStatus]   = useState(null);
   const [message, setMessage] = useState("");
 
@@ -31,8 +31,11 @@ export default function AlertsPanel({ jobName, user }) {
         recipient_email: email,
       });
       if (res.data.sent) {
-        setStatus("sent");
-        setMessage(`Alert sent to ${res.data.recipient} — ${res.data.anomaly_count} anomal${res.data.anomaly_count !== 1 ? "ies" : "y"} reported.`);
+        const count = `${res.data.anomaly_count} anomal${res.data.anomaly_count !== 1 ? "ies" : "y"}`;
+        setStatus(res.data.simulated ? "simulated" : "sent");
+        setMessage(res.data.simulated
+          ? `Alert simulated: ${count} recorded in history. No email is sent on sample data.`
+          : `Alert sent to ${res.data.recipient}: ${count} reported.`);
       } else {
         setStatus("no_anomalies");
         setMessage(res.data.reason);
@@ -45,6 +48,7 @@ export default function AlertsPanel({ jobName, user }) {
 
   const STATUS_CONFIG = {
     sent:         { color: "var(--accent)",  icon: "✓", label: "Alert sent" },
+    simulated:    { color: "var(--info)",    icon: "✓", label: "Alert simulated" },
     no_anomalies: { color: "var(--info)",    icon: "✓", label: "No anomalies" },
     error:        { color: "var(--danger)",  icon: "✕", label: "Error" },
     sending:      { color: "var(--muted)",   icon: "…", label: "Sending" },
@@ -75,6 +79,7 @@ export default function AlertsPanel({ jobName, user }) {
             type="email"
             value={email}
             onChange={e => setEmail(e.target.value)}
+            placeholder="you@example.com"
             disabled={!canTrigger}
             style={{
               background: "var(--bg)",
@@ -96,7 +101,7 @@ export default function AlertsPanel({ jobName, user }) {
             <button
               className="btn"
               onClick={triggerAlert}
-              disabled={!jobName || !canTrigger || status === "sending"}
+              disabled={!jobName || !canTrigger || !email || status === "sending"}
               title={!canTrigger ? "Analysts cannot trigger live alerts — read-only access" : undefined}
               style={{
                 borderColor: canTrigger && jobName ? "var(--accent)" : "var(--border2)",
@@ -126,7 +131,7 @@ export default function AlertsPanel({ jobName, user }) {
 
         <p style={{ fontSize: "0.7rem", color: "var(--muted)", lineHeight: 1.6 }}>
           {canTrigger
-            ? "Vigil will scan the selected job's run history for anomalies. If any are found, a formatted alert email is sent to the address above via SendGrid."
+            ? "Vigil will scan the selected job's run history for anomalies. If any are found, the alert is recorded in history and emailed via SendGrid. On sample data the email is simulated and nothing is sent."
             : "Alert triggering requires admin access. Contact your administrator to send alerts."}
         </p>
       </div>

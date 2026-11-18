@@ -226,11 +226,6 @@ export default function App() {
     doLogout();
   };
 
-  const handleUserUpdate = (updatedUser) => {
-    localStorage.setItem("vigil_user", JSON.stringify(updatedUser));
-    setUser(updatedUser);
-  };
-
   return (
     <Routes>
       <Route
@@ -250,7 +245,7 @@ export default function App() {
         path="/app"
         element={
           token
-            ? <AppShell user={user} onLogout={handleLogout} onUserUpdate={handleUserUpdate} />
+            ? <AppShell user={user} onLogout={handleLogout} />
             : <Navigate to="/" replace />
         }
       >
