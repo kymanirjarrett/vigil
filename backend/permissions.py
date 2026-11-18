@@ -17,6 +17,9 @@ PERMISSIONS = {
     "analyst": {
         "jobs:read", "alerts:read", "anomalies:read",
     },
+    "guest": {
+        "jobs:read", "alerts:read", "anomalies:read", "security:read",
+    },
 }
 
 _CACHE_TTL = 300  # seconds
