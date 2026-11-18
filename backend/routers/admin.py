@@ -106,6 +106,9 @@ def update_user(
     target = db.query(User).filter(User.id == uid).first()
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
+    if target.role == "guest":
+        # Changing the shared account's role would hand that role to every visitor.
+        raise HTTPException(status_code=400, detail="The shared guest account cannot be modified")
 
     if body.role is not None:
         if body.role not in VALID_ROLES:

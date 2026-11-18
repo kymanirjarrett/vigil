@@ -1,4 +1,5 @@
 import time
+from dataclasses import dataclass
 
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -12,13 +13,13 @@ PERMISSIONS = {
     "admin": {
         "jobs:read", "jobs:read:live", "alerts:read", "alerts:trigger",
         "anomalies:read", "users:read", "users:manage", "audit:read",
-        "security:read",
+        "security:read", "account:manage",
     },
     "analyst": {
-        "jobs:read", "alerts:read", "anomalies:read",
+        "jobs:read", "alerts:read", "anomalies:read", "account:manage",
     },
     "guest": {
-        "jobs:read", "alerts:read", "anomalies:read", "security:read",
+        "jobs:read", "alerts:read", "anomalies:read", "security:read:sample",
     },
 }
 
@@ -72,4 +73,32 @@ def require_permission(permission: str):
                 detail="Insufficient permissions",
             )
         return current_user
+    return checker
+
+
+SAMPLE_SECURITY_PERMISSION = "security:read:sample"
+
+
+@dataclass(frozen=True)
+class SecurityViewer:
+    user: User
+    sample: bool  # True: serve synthetic security data, never real rows
+
+
+def require_security_view(permission: str):
+    """Guard for security pages. Holders of `permission` see real data;
+    holders of security:read:sample (the guest) see synthetic data; everyone
+    else gets 403. Routes must branch on `viewer.sample`."""
+    def checker(
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> SecurityViewer:
+        if has_permission(current_user.role, permission, db):
+            return SecurityViewer(current_user, sample=False)
+        if has_permission(current_user.role, SAMPLE_SECURITY_PERMISSION, db):
+            return SecurityViewer(current_user, sample=True)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions",
+        )
     return checker

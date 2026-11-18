@@ -18,6 +18,7 @@ from routers.auth import (
     _user_dict,
     create_access_token,
     get_current_user,
+    require_account_manage,
 )
 
 router = APIRouter()
@@ -103,7 +104,7 @@ def totp_status(current_user: User = Depends(get_current_user)):
 
 @router.post("/totp/enroll")
 def totp_enroll(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_account_manage),
     db: Session = Depends(get_db),
 ):
     secret = pyotp.random_base32()
@@ -121,7 +122,7 @@ def totp_enroll(
 def totp_confirm(
     body: ConfirmBody,
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_account_manage),
     db: Session = Depends(get_db),
 ):
     if not current_user.totp_secret:
@@ -150,7 +151,7 @@ def totp_confirm(
 def totp_disable(
     body: DisableBody,
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_account_manage),
     db: Session = Depends(get_db),
 ):
     if not current_user.totp_enabled:
@@ -175,7 +176,7 @@ def totp_disable(
 def regenerate_backup_codes(
     body: ConfirmBody,
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_account_manage),
     db: Session = Depends(get_db),
 ):
     if not current_user.totp_enabled:
