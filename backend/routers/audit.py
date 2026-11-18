@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from database import get_db
 from models import AuditLogEntry
-from permissions import require_permission
-from models import User
+from permissions import SecurityViewer, require_security_view
+from security_seed import get_seed_audit_log
 from datetime import datetime
 
 router = APIRouter()
@@ -18,9 +18,12 @@ def get_audit_log(
     user_id: str = Query(None),
     since: datetime = Query(None),
     until: datetime = Query(None),
-    _: User = Depends(require_permission("audit:read")),
+    viewer: SecurityViewer = Depends(require_security_view("audit:read")),
     db: Session = Depends(get_db),
 ):
+    if viewer.sample:
+        return get_seed_audit_log(action=action, page=page, page_size=page_size)
+
     q = db.query(AuditLogEntry).order_by(desc(AuditLogEntry.created_at))
 
     if action:
@@ -36,6 +39,7 @@ def get_audit_log(
     rows = q.offset((page - 1) * page_size).limit(page_size).all()
 
     return {
+        "source": "live",
         "total": total,
         "page": page,
         "page_size": page_size,

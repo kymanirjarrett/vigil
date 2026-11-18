@@ -9,22 +9,17 @@ from auth_detection import detect_auth_anomalies
 from database import get_db
 from security_seed import get_seed_security_posture
 from models import AuditLogEntry, AuthEvent, User
-from permissions import require_permission
+from permissions import SecurityViewer, require_security_view
 
 router = APIRouter()
 
 
-def _use_sample(user: User) -> bool:
-    # The shared guest account only ever sees synthetic security data.
-    return user.role == "guest"
-
-
 @router.get("/posture")
 def get_security_posture(
-    current_user: User = Depends(require_permission("security:read")),
+    viewer: SecurityViewer = Depends(require_security_view("security:read")),
     db: Session = Depends(get_db),
 ):
-    if _use_sample(current_user):
+    if viewer.sample:
         return get_seed_security_posture()
 
     now       = datetime.now(timezone.utc)
