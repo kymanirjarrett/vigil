@@ -12,7 +12,7 @@ PERMISSIONS = {
     "admin": {
         "jobs:read", "jobs:read:live", "alerts:read", "alerts:trigger",
         "anomalies:read", "users:read", "users:manage", "audit:read",
-        "security:read", "mode:toggle",
+        "security:read",
     },
     "analyst": {
         "jobs:read", "alerts:read", "anomalies:read",
