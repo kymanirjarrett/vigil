@@ -13,6 +13,7 @@ from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
 from database import get_db
+from guest import GUEST_EMAIL, GuestAccountError, get_or_create_guest, is_guest
 from models import AuthEvent, RefreshToken, User
 from passwords import MAX_PASSWORD_BYTES, hash_password, verify_password
 
@@ -135,6 +136,17 @@ def get_current_user(
     return user
 
 
+def require_account_manage(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> User:
+    """Self-service account changes (2FA, sessions). The shared guest lacks it."""
+    from permissions import has_permission  # permissions imports this module
+    if not has_permission(current_user.role, "account:manage", db):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+    return current_user
+
+
 # ── Request bodies ────────────────────────────────────────────────────────────
 
 class LoginRequest(BaseModel):
@@ -145,6 +157,10 @@ class LoginRequest(BaseModel):
 class SignupRequest(BaseModel):
     email: str
     password: str
+
+
+class LogoutRequest(BaseModel):
+    refresh_token: str | None = None
 
 
 class RefreshRequest(BaseModel):
@@ -162,7 +178,7 @@ def signup(req: SignupRequest, request: Request, db: Session = Depends(get_db)):
 
     email    = _normalize_email(req.email)
     existing = db.query(User).filter(User.email == email).first()
-    if existing:
+    if existing or email == GUEST_EMAIL:
         raise HTTPException(status_code=409, detail="Email already registered")
 
     user = User(
@@ -204,10 +220,12 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
             detail="Too many login attempts, please try again later",
         )
 
-    if not user or not verify_password(req.password, user.password_hash):
+    if not user or is_guest(user) or not verify_password(req.password, user.password_hash):
         _record_auth_event(db, request, "login_failure", email, user)
 
-        if user and user.role != "admin":
+        # Admins are exempt so they cannot be locked out; the shared guest is
+        # exempt so one visitor cannot lock it for everyone.
+        if user and user.role != "admin" and not is_guest(user):
             window_start  = now - timedelta(minutes=LOCKOUT_MINUTES)
             failure_count = db.query(AuthEvent).filter(
                 AuthEvent.email      == email,
@@ -246,6 +264,30 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     access_token      = create_access_token(user)
     refresh_raw, _    = _issue_refresh_token(db, user, request)
 
+    return {
+        "access_token":  access_token,
+        "refresh_token": refresh_raw,
+        "token_type":    "bearer",
+        "user":          _user_dict(user),
+    }
+
+
+@router.post("/guest")
+@limiter.limit("10/minute")
+def guest_login(request: Request, db: Session = Depends(get_db)):
+    """One-click demo access: normal tokens for the shared read-only guest."""
+    try:
+        user = get_or_create_guest(db)
+    except GuestAccountError:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                            detail="Demo access is unavailable")
+
+    _record_auth_event(db, request, "guest_login", user.email, user)
+    from audit import log_action
+    log_action(db, "user.guest_login", request, user=user, resource_type="user", resource_id=str(user.id))
+
+    access_token   = create_access_token(user)
+    refresh_raw, _ = _issue_refresh_token(db, user, request)
     return {
         "access_token":  access_token,
         "refresh_token": refresh_raw,
@@ -299,21 +341,37 @@ def refresh_token(req: RefreshRequest, request: Request, db: Session = Depends(g
 
 @router.post("/logout")
 def logout(
+    req: LogoutRequest | None = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    now = datetime.now(timezone.utc)
-    db.query(RefreshToken).filter(
-        RefreshToken.user_id    == current_user.id,
+    """Revoke this device's session chain (the refresh token's family). Without
+    a refresh token, revoke all of the user's sessions, except for the shared
+    guest, where that would sign out every other visitor."""
+    now   = datetime.now(timezone.utc)
+    query = db.query(RefreshToken).filter(
+        RefreshToken.user_id == current_user.id,
         ~RefreshToken.is_revoked,
-    ).update({"is_revoked": True, "revoked_at": now})
+    )
+    if req and req.refresh_token:
+        record = db.query(RefreshToken).filter(
+            RefreshToken.token_hash == _hash_token(req.refresh_token),
+            RefreshToken.user_id    == current_user.id,
+        ).first()
+        if record is None:
+            return {"message": "Logged out"}
+        query = query.filter(RefreshToken.family_id == record.family_id)
+    elif is_guest(current_user):
+        return {"message": "Logged out"}
+
+    query.update({"is_revoked": True, "revoked_at": now}, synchronize_session=False)
     db.commit()
     return {"message": "Logged out"}
 
 
 @router.get("/sessions")
 def list_sessions(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_account_manage),
     db: Session = Depends(get_db),
 ):
     now     = datetime.now(timezone.utc)
@@ -344,7 +402,7 @@ def list_sessions(
 @router.delete("/sessions/{session_id}")
 def revoke_session(
     session_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_account_manage),
     db: Session = Depends(get_db),
 ):
     try:

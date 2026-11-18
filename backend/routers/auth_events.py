@@ -2,13 +2,14 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from database import get_db
-from models import AuthEvent, User
-from permissions import require_permission
+from models import AuthEvent
+from permissions import SecurityViewer, require_security_view
+from security_seed import get_seed_auth_events
 from datetime import datetime
 
 router = APIRouter()
 
-EVENT_TYPE_VALUES = ("login_success", "login_failure", "signup")
+EVENT_TYPE_VALUES = ("login_success", "login_failure", "signup", "guest_login")
 
 
 @router.get("")
@@ -19,9 +20,12 @@ def get_auth_events(
     email: str = Query(None, description="Filter by email (exact match)"),
     since: datetime = Query(None),
     until: datetime = Query(None),
-    _: User = Depends(require_permission("audit:read")),
+    viewer: SecurityViewer = Depends(require_security_view("audit:read")),
     db: Session = Depends(get_db),
 ):
+    if viewer.sample:
+        return get_seed_auth_events(event_type=event_type, email=email, page=page, page_size=page_size)
+
     q = db.query(AuthEvent).order_by(desc(AuthEvent.created_at))
 
     if event_type:
@@ -37,6 +41,7 @@ def get_auth_events(
     rows = q.offset((page - 1) * page_size).limit(page_size).all()
 
     return {
+        "source": "live",
         "total": total,
         "page": page,
         "page_size": page_size,

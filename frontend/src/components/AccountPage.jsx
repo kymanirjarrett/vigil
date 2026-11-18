@@ -251,13 +251,15 @@ function RegenerateFlow({ onDone }) {
 export default function AccountPage({ user }) {
   const [totpEnabled, setTotpEnabled] = useState(user?.totp_enabled ?? false);
   const [panel, setPanel]             = useState(null); // null | "enroll" | "disable" | "regen"
-  const [loading, setLoading]         = useState(true);
+  const isGuest = user?.role === "guest";
+  const [loading, setLoading]         = useState(!isGuest);
 
   useEffect(() => {
+    if (isGuest) return; // the shared demo account has no 2FA settings
     axios.get(`${API}/api/v1/auth/totp/status`)
       .then(res => setTotpEnabled(res.data.enabled))
       .finally(() => setLoading(false));
-  }, []);
+  }, [isGuest]);
 
   return (
     <div style={{ maxWidth: 520 }}>
@@ -283,6 +285,14 @@ export default function AccountPage({ user }) {
         </div>
       </div>
 
+      {isGuest ? (
+        <div className="panel">
+          <div style={{ padding: "1rem 1.25rem", fontSize: "0.78rem", color: "var(--muted)", lineHeight: 1.6 }}>
+            This is a shared, read-only demo account, so password, 2FA, and session
+            settings are turned off. Create an account to try them.
+          </div>
+        </div>
+      ) : (
       <div className="panel">
         <div className="panel-header">
           <span className="panel-title">Two-Factor Authentication</span>
@@ -340,6 +350,7 @@ export default function AccountPage({ user }) {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }
