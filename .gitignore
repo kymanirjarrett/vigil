@@ -13,3 +13,9 @@ venv/
 node_modules/
 dist/
 .DS_Store
+
+# Test artifacts
+.pytest_cache/
+.coverage
+coverage.xml
+coverage/

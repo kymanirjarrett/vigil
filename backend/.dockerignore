@@ -5,3 +5,10 @@ venv/
 __pycache__/
 *.pyc
 .ruff_cache/
+tests/
+requirements-dev.txt
+pytest.ini
+.coveragerc
+.pytest_cache/
+.coverage
+coverage.xml
