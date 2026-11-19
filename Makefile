@@ -10,7 +10,7 @@ dev-frontend:
 	cd frontend && npm run dev
 
 install-backend:
-	backend/venv/bin/pip install -r backend/requirements.txt
+	backend/venv/bin/pip install -r backend/requirements-dev.txt
 
 install-frontend:
 	cd frontend && npm install
