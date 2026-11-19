@@ -50,6 +50,12 @@ flowchart LR
 
 The API checks permissions on every request through a single `require_permission` dependency, and every write that matters goes through `log_action`, so authorization and auditing live in one place instead of being repeated per route.
 
+### Database keep-alive
+
+Supabase pauses free projects after a week of low database activity, and a paused project can only be restored from the dashboard for up to a year. A [cron-job.org](https://cron-job.org) job sends `GET /health/deep` every 3 days, with failure emails on. That endpoint runs a real `SELECT 1`, which resets the inactivity timer.
+
+The ping used to be a scheduled GitHub Actions workflow. GitHub disables scheduled workflows in public repositories after 60 days without repository activity, so a finished project would lose its keep-alive silently. [`supabase-ping.yml`](.github/workflows/supabase-ping.yml) remains as a manual fallback. A 3-day interval is deliberate: a 5-minute uptime monitor would keep the Render instance awake all month and use up the free instance hours.
+
 ### Infrastructure as code
 
 [`infra/vigil-stack.yaml`](infra/vigil-stack.yaml) provisions a real pipeline for Vigil to monitor: S3 buckets for input, output, scripts, and Athena results, a Glue database, table, job, and crawler, a Glue service role, and a read-only IAM policy for the backend. It deploys through a manual GitHub Actions workflow per environment, and `prod` requires an approval from a repository admin. See [`infra/README.md`](infra/README.md).
@@ -116,7 +122,7 @@ vigil/
 │   └── main.py
 ├── frontend/src/components/   dashboard, admin, audit, security, and account pages
 ├── infra/                     CloudFormation stack, Glue script, seed data
-├── .github/workflows/         CI, CloudFormation deploy, database keep-alive
+├── .github/workflows/         CI, CloudFormation deploy, manual keep-alive fallback
 └── .husky/                    pre-commit secret scan, pre-push lint
 ```
 
