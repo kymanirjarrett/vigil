@@ -31,7 +31,7 @@ AWS Glue jobs fail quietly. Usually the first sign is a downstream user noticing
 - **Role-based access control.** Admin and Analyst roles map to granular permissions (`jobs:read`, `alerts:trigger`, `users:manage`, `audit:read`, and more), stored in the database and enforced server-side on every route. Analysts get read-only access by default.
 - **Row-level security on every table.** RLS is enabled in the same Alembic migration that creates each table, with an explicit `service_role` policy, so a new table can't ship without it.
 - **Append-only audit log.** Every significant action is recorded with the user, resource, IP address, and user agent. Rows are never updated or deleted.
-- **Authentication hardening.** bcrypt password hashing, 15-minute JWT access tokens, rotating refresh tokens stored only as SHA-256 hashes, rate-limited login (5 per minute), and account lockout after repeated failures. Reusing a refresh token that was already rotated revokes every session for that user.
+- **Authentication hardening.** bcrypt password hashing, 15-minute JWT access tokens, rotating refresh tokens stored only as SHA-256 hashes, rate-limited login (5 per minute), and account lockout after repeated failures. Reusing a refresh token that was already rotated revokes that whole session chain (its token family), so a stolen token stops working for the attacker and the victim alike, while the user's other devices stay signed in.
 - **Two-factor authentication.** TOTP enrollment with one-time backup codes.
 - **Threat detection.** Every login attempt is recorded, including attempts for emails that don't exist, which is what makes brute force (repeated failures against one account) and credential stuffing (failures spread across many accounts) detectable.
 - **Security posture dashboard.** Hourly login successes and failures, the IPs with the most failures, open threat detections, users by role, and recent admin actions in one view. Users can also see their active sessions and sign any of them out.
@@ -75,7 +75,8 @@ The ping used to be a scheduled GitHub Actions workflow. GitHub disables schedul
 
 ## Engineering practices
 
-- **CI on every push and pull request:** Ruff and a compile check on the backend; ESLint, a production build, and `npm audit` (fails on high severity) on the frontend.
+- **CI on every push and pull request:** Ruff and a compile check on the backend; ESLint, a production build, and `npm audit` (fails on high severity) on the frontend; pytest and Vitest suites with coverage in the job summary.
+- **Tests against real Postgres:** the backend suite applies the actual Alembic migrations to a disposable Postgres 17 (a service container in CI), so RLS and constraints behave as in production. It refuses to run against any non-local database host.
 - **Secret scanning before every commit:** a Husky pre-commit hook runs secretlint on staged files, and a pre-push hook lints both apps.
 - **Migrations only:** every schema change is an Alembic migration, and RLS ships in the same migration as the table.
 - **Issue-driven workflow:** every pull request closes an issue (`Closes #N`).
@@ -94,6 +95,18 @@ Fill in `backend/.env`, then run each app in its own terminal:
 ```bash
 npm run dev:backend    # FastAPI on :8000
 npm run dev:frontend   # Vite on :5173
+```
+
+### Run the tests
+
+```bash
+# Backend: needs a disposable Postgres, never the production database
+docker run -d --name vigil-test-pg -e POSTGRES_PASSWORD=test -p 5433:5432 postgres:17
+cd backend && pip install -r requirements-dev.txt
+TEST_DATABASE_URL=postgresql://postgres:test@localhost:5433/postgres python -m pytest
+
+# Frontend
+cd frontend && npm test
 ```
 
 ### Environment variables
