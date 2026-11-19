@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { API } from "../api";
 import {
   BarChart,
   Bar,
@@ -9,8 +10,6 @@ import {
   ResponsiveContainer,
   Cell,
 } from "recharts";
-
-const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 const STATUS_COLOR = {
   SUCCEEDED: "var(--accent)",

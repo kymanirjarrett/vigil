@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import axios from "axios";
+import { API } from "../api";
 import TryDemoButton from "./TryDemoButton";
-
-const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 function CredentialsStep({ onSuccess, onDemo }) {
   const [email, setEmail]       = useState("");

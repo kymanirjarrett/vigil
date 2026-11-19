@@ -1,7 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
-
-const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+import { API } from "../api";
 
 const ANALYST_PERMISSIONS = new Set(["jobs:read", "alerts:read", "anomalies:read"]);
 const ADMIN_PERMISSIONS   = new Set([

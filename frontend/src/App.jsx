@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import axios from "axios";
+import { API } from "./api";
 import LandingPage from "./components/LandingPage";
 import LoginPage from "./components/LoginPage";
 import SignupPage from "./components/SignupPage";
@@ -16,8 +17,6 @@ import PermissionsPage from "./components/PermissionsPage";
 import AccountPage from "./components/AccountPage";
 import "./App.css";
 
-const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
-
 const _stored     = localStorage.getItem("vigil_token");
 const _storedUser = (() => {
   try { return JSON.parse(localStorage.getItem("vigil_user")); } catch { return null; }
@@ -25,101 +24,27 @@ const _storedUser = (() => {
 
 if (_stored) axios.defaults.headers.common["Authorization"] = `Bearer ${_stored}`;
 
-function AuditRoute() {
+function Page({ title, subtitle, children }) {
   return (
     <>
       <div className="page-title">
-        <h1>Audit Log</h1>
-        <p>Immutable record of all user actions — append-only</p>
+        <h1>{title}</h1>
+        <p>{subtitle}</p>
       </div>
-      <AuditLogPage />
+      {children}
     </>
   );
 }
 
-function SecurityRoute() {
-  return (
-    <>
-      <div className="page-title">
-        <h1>Security Events</h1>
-        <p>Authentication event stream — all login attempts, successes, and signups</p>
-      </div>
-      <SecurityEventsPage />
-    </>
-  );
-}
-
-function SecurityPostureRoute() {
-  return (
-    <>
-      <div className="page-title">
-        <h1>Security Posture</h1>
-        <p>Aggregated security metrics — login activity, anomalies, and recent events</p>
-      </div>
-      <SecurityPosturePage />
-    </>
-  );
-}
-
-function ThreatDetectionRoute() {
-  return (
-    <>
-      <div className="page-title">
-        <h1>Threat Detection</h1>
-        <p>Live scan for brute-force and credential-stuffing attacks in auth event history</p>
-      </div>
-      <ThreatDetectionPage />
-    </>
-  );
-}
-
-function AdminUsersRoute({ user }) {
-  return (
-    <>
-      <div className="page-title">
-        <h1>User Management</h1>
-        <p>Manage roles, lockouts, and sessions for all accounts</p>
-      </div>
-      <AdminUsersPage currentUserId={user?.id} />
-    </>
-  );
-}
-
-function PermissionsRoute() {
-  return (
-    <>
-      <div className="page-title">
-        <h1>Permissions</h1>
-        <p>Live role-permission matrix — toggle access rights without a code deploy</p>
-      </div>
-      <PermissionsPage />
-    </>
-  );
-}
-
-function AccountRoute({ user }) {
-  return (
-    <>
-      <div className="page-title">
-        <h1>Account</h1>
-        <p>{user?.role === "guest" ? "Shared demo account" : "Manage your profile and two-factor authentication"}</p>
-      </div>
-      <AccountPage user={user} />
-    </>
-  );
-}
-
-function SessionsRoute() {
-  return (
-    <>
-      <div className="page-title">
-        <h1>Sessions</h1>
-        <p>Your active login sessions — revoke any device at any time</p>
-      </div>
-      <SessionsPage />
-    </>
-  );
-}
+const PAGES = {
+  sessions:    { title: "Sessions", subtitle: "Your active login sessions — revoke any device at any time" },
+  adminUsers:  { title: "User Management", subtitle: "Manage roles, lockouts, and sessions for all accounts" },
+  permissions: { title: "Permissions", subtitle: "Live role-permission matrix — toggle access rights without a code deploy" },
+  posture:     { title: "Security Posture", subtitle: "Aggregated security metrics — login activity, anomalies, and recent events" },
+  threats:     { title: "Threat Detection", subtitle: "Live scan for brute-force and credential-stuffing attacks in auth event history" },
+  security:    { title: "Security Events", subtitle: "Authentication event stream — all login attempts, successes, and signups" },
+  audit:       { title: "Audit Log", subtitle: "Immutable record of all user actions — append-only" },
+};
 
 // Guests see the security pages, which serve them sample data server-side.
 const canViewSecurity = (user) => user?.role === "admin" || user?.role === "guest";
@@ -258,33 +183,43 @@ export default function App() {
         <Route path="dashboard" element={<DashboardView />} />
         <Route
           path="sessions"
-          element={user?.role === "guest" ? <Navigate to="/app/dashboard" replace /> : <SessionsRoute />}
+          element={user?.role === "guest" ? <Navigate to="/app/dashboard" replace /> : <Page {...PAGES.sessions}><SessionsPage /></Page>}
         />
         <Route
           path="admin/users"
-          element={user?.role === "admin" ? <AdminUsersRoute user={user} /> : <Navigate to="/app/dashboard" replace />}
+          element={user?.role === "admin" ? <Page {...PAGES.adminUsers}><AdminUsersPage currentUserId={user?.id} /></Page> : <Navigate to="/app/dashboard" replace />}
         />
         <Route
           path="admin/permissions"
-          element={user?.role === "admin" ? <PermissionsRoute /> : <Navigate to="/app/dashboard" replace />}
+          element={user?.role === "admin" ? <Page {...PAGES.permissions}><PermissionsPage /></Page> : <Navigate to="/app/dashboard" replace />}
         />
         <Route
           path="posture"
-          element={canViewSecurity(user) ? <SecurityPostureRoute /> : <Navigate to="/app/dashboard" replace />}
+          element={canViewSecurity(user) ? <Page {...PAGES.posture}><SecurityPosturePage /></Page> : <Navigate to="/app/dashboard" replace />}
         />
         <Route
           path="threats"
-          element={canViewSecurity(user) ? <ThreatDetectionRoute /> : <Navigate to="/app/dashboard" replace />}
+          element={canViewSecurity(user) ? <Page {...PAGES.threats}><ThreatDetectionPage /></Page> : <Navigate to="/app/dashboard" replace />}
         />
         <Route
           path="security"
-          element={canViewSecurity(user) ? <SecurityRoute /> : <Navigate to="/app/dashboard" replace />}
+          element={canViewSecurity(user) ? <Page {...PAGES.security}><SecurityEventsPage /></Page> : <Navigate to="/app/dashboard" replace />}
         />
         <Route
           path="audit"
-          element={canViewSecurity(user) ? <AuditRoute /> : <Navigate to="/app/dashboard" replace />}
+          element={canViewSecurity(user) ? <Page {...PAGES.audit}><AuditLogPage /></Page> : <Navigate to="/app/dashboard" replace />}
         />
-        <Route path="account" element={<AccountRoute user={user} />} />
+        <Route
+          path="account"
+          element={
+            <Page
+              title="Account"
+              subtitle={user?.role === "guest" ? "Shared demo account" : "Manage your profile and two-factor authentication"}
+            >
+              <AccountPage user={user} />
+            </Page>
+          }
+        />
       </Route>
 
       <Route

@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-
-const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+import { API } from "../api";
 
 const SEVERITY_STYLES = {
   critical: { bg: "rgba(255,71,87,0.12)",  color: "var(--danger)", label: "CRITICAL" },

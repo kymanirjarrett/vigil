@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { API } from "../api";
 
-const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 const PAGE_SIZE = 50;
 
 const ACTION_COLORS = {
   "user.login":      { bg: "rgba(0,229,160,0.1)",  color: "var(--accent)" },
   "user.signup":     { bg: "rgba(74,158,255,0.1)",  color: "var(--info)" },
   "alert.triggered": { bg: "rgba(245,166,35,0.12)", color: "var(--warn)" },
-  "mode.toggled":    { bg: "rgba(90,95,114,0.2)",   color: "var(--muted)" },
 };
 
 function ActionBadge({ action }) {
