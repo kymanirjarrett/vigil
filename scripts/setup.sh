@@ -5,7 +5,7 @@ echo "→ Creating Python virtual environment..."
 python3 -m venv backend/venv
 
 echo "→ Installing Python dependencies..."
-backend/venv/bin/pip install --quiet -r backend/requirements.txt
+backend/venv/bin/pip install --quiet -r backend/requirements-dev.txt
 
 echo "→ Installing frontend dependencies..."
 cd frontend && npm install --silent && cd ..
