@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { API } from "../api";
 
-const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 const PAGE_SIZE = 50;
 
 const EVENT_STYLES = {

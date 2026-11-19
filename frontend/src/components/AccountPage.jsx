@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import axios from "axios";
-
-const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+import { API } from "../api";
 
 function BackupCodeGrid({ codes }) {
   return (

@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { API } from "../api";
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   ResponsiveContainer,
 } from "recharts";
-
-const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
 
 const ACTION_COLORS = {
   "user.locked":   "var(--danger)",

@@ -1,7 +1,6 @@
 import { useState } from "react";
 import axios from "axios";
-
-const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+import { API } from "../api";
 
 /**
  * One click: get tokens for the shared read-only guest account and hand them

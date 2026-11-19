@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
-
-const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+import { API } from "../api";
 
 function isLocked(user) {
   if (!user.locked_until) return false;

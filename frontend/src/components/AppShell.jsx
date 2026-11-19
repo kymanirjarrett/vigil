@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, Link } from "react-router-dom";
 import axios from "axios";
-
-const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+import { API } from "../api";
 
 const NAV_ITEMS = [
   { to: "/app/dashboard",   label: "Dashboard",        icon: "◈", roles: ["admin", "analyst", "guest"] },
