@@ -1,6 +1,6 @@
 import hashlib
 import secrets
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pyotp
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -8,16 +8,15 @@ from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from audit import log_action
 from database import get_db
 from models import BackupCode, User
 from routers.auth import (
     ALGORITHM,
-    _issue_refresh_token,
     _record_auth_event,
     _secret_key,
-    _user_dict,
-    create_access_token,
     get_current_user,
+    issue_session,
     require_account_manage,
 )
 
@@ -35,7 +34,7 @@ def _decode_pre_auth_token(token: str) -> str:
             raise ValueError("wrong stage")
         return payload["sub"]
     except (JWTError, KeyError, ValueError):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired 2FA session")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired 2FA session") from None
 
 
 def _normalize_code(code: str) -> str:
@@ -73,7 +72,7 @@ def _verify_code(user: User, raw_code: str, db: Session) -> bool:
         ).first()
         if record:
             record.used    = True
-            record.used_at = datetime.now(timezone.utc)
+            record.used_at = datetime.now(UTC)
             db.commit()
             return True
 
@@ -140,7 +139,6 @@ def totp_confirm(
 
     backup_codes = _make_backup_codes(db, current_user.id)
 
-    from audit import log_action
     log_action(db, "user.totp_enabled", request, user=current_user,
                resource_type="user", resource_id=str(current_user.id))
 
@@ -165,7 +163,6 @@ def totp_disable(
     db.query(BackupCode).filter(BackupCode.user_id == current_user.id).delete()
     db.commit()
 
-    from audit import log_action
     log_action(db, "user.totp_disabled", request, user=current_user,
                resource_type="user", resource_id=str(current_user.id))
 
@@ -187,7 +184,6 @@ def regenerate_backup_codes(
 
     backup_codes = _make_backup_codes(db, current_user.id)
 
-    from audit import log_action
     log_action(db, "user.backup_codes_regenerated", request, user=current_user,
                resource_type="user", resource_id=str(current_user.id))
 
@@ -212,12 +208,4 @@ def totp_verify_login(
 
     _record_auth_event(db, request, "login_success", user.email, user)
 
-    access_token    = create_access_token(user)
-    refresh_raw, _  = _issue_refresh_token(db, user, request)
-
-    return {
-        "access_token":  access_token,
-        "refresh_token": refresh_raw,
-        "token_type":    "bearer",
-        "user":          _user_dict(user),
-    }
+    return issue_session(db, user, request)

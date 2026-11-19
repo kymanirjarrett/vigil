@@ -1,6 +1,6 @@
 import os
-from datetime import datetime, timedelta, timezone
 from collections import defaultdict
+from datetime import UTC, datetime, timedelta
 
 BRUTE_FORCE_THRESHOLD        = int(os.getenv("BRUTE_FORCE_THRESHOLD",        "5"))
 BRUTE_FORCE_WINDOW_MINUTES   = int(os.getenv("BRUTE_FORCE_WINDOW_MINUTES",   "10"))
@@ -10,13 +10,22 @@ CRED_STUFFING_WINDOW_MINUTES = int(os.getenv("CRED_STUFFING_WINDOW_MINUTES", "5"
 
 def _as_utc(ts) -> datetime:
     if isinstance(ts, datetime):
-        return ts if ts.tzinfo else ts.replace(tzinfo=timezone.utc)
+        return ts if ts.tzinfo else ts.replace(tzinfo=UTC)
     if isinstance(ts, str):
         try:
             return datetime.fromisoformat(ts.replace("Z", "+00:00"))
         except ValueError:
             pass
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
+
+
+def event_dicts(rows) -> list[dict]:
+    """AuthEvent rows -> the plain dicts the detection rules take."""
+    return [
+        {"email": r.email, "event_type": r.event_type,
+         "ip_address": r.ip_address, "created_at": r.created_at}
+        for r in rows
+    ]
 
 
 def detect_brute_force(events: list, threshold: int, window_minutes: int) -> list:

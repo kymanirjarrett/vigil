@@ -1,13 +1,13 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from auth_detection import detect_auth_anomalies
+from auth_detection import detect_auth_anomalies, event_dicts
 from database import get_db
-from security_seed import get_seed_auth_anomalies
 from models import AuthEvent
 from permissions import SecurityViewer, require_security_view
+from security_seed import get_seed_auth_anomalies
 
 router = APIRouter()
 
@@ -27,20 +27,10 @@ def get_auth_anomalies(
             "source":        "sample",
         }
 
-    since = datetime.now(timezone.utc) - timedelta(hours=lookback_hours)
+    since = datetime.now(UTC) - timedelta(hours=lookback_hours)
     rows = db.query(AuthEvent).filter(AuthEvent.created_at >= since).all()
 
-    events = [
-        {
-            "email":      row.email,
-            "event_type": row.event_type,
-            "ip_address": row.ip_address,
-            "created_at": row.created_at,
-        }
-        for row in rows
-    ]
-
-    anomalies = detect_auth_anomalies(events)
+    anomalies = detect_auth_anomalies(event_dicts(rows))
     return {
         "anomaly_count": len(anomalies),
         "anomalies":     anomalies,

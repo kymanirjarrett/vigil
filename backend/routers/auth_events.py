@@ -1,15 +1,15 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy.orm import Session
 from sqlalchemy import desc
+from sqlalchemy.orm import Session
+
 from database import get_db
 from models import AuthEvent
 from permissions import SecurityViewer, require_security_view
 from security_seed import get_seed_auth_events
-from datetime import datetime
 
 router = APIRouter()
-
-EVENT_TYPE_VALUES = ("login_success", "login_failure", "signup", "guest_login")
 
 
 @router.get("")

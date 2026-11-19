@@ -5,6 +5,7 @@ import sys
 from unittest import mock
 
 from conftest import BACKEND, auth_header
+
 from models import AlertLog
 
 ALERT = {"job_name": "customer-data-pipeline", "recipient_email": "oncall@example.com"}

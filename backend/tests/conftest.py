@@ -29,6 +29,7 @@ if urlparse(_test_db).hostname not in _ALLOWED_DB_HOSTS:
 
 # Never read backend/.env: it may hold production credentials.
 import dotenv  # noqa: E402
+
 dotenv.load_dotenv = lambda *a, **k: False
 
 for _var in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN",

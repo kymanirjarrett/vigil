@@ -1,6 +1,6 @@
 import sys
-from pathlib import Path
 from logging.config import fileConfig
+from pathlib import Path
 
 from alembic import context
 from dotenv import load_dotenv
@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 # Ensure `models` and `database` are importable regardless of CWD
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from models import Base
 from database import engine
+from models import Base
 
 load_dotenv()
 

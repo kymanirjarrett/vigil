@@ -2,7 +2,7 @@ import hashlib
 import os
 import secrets
 import uuid as uuid_lib
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
@@ -12,6 +12,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 
+from audit import client_ip, log_action
 from database import get_db
 from guest import GUEST_EMAIL, GuestAccountError, get_or_create_guest, is_guest
 from models import AuthEvent, RefreshToken, User
@@ -40,13 +41,6 @@ def _normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
-def _extract_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else None
-
-
 def _hash_token(raw: str) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
@@ -56,7 +50,7 @@ def _record_auth_event(db, request, event_type, email, user=None):
         email=email,
         user_id=user.id if user else None,
         event_type=event_type,
-        ip_address=_extract_ip(request),
+        ip_address=client_ip(request),
         user_agent=request.headers.get("user-agent"),
     ))
     db.commit()
@@ -71,7 +65,7 @@ def _user_dict(user: User) -> dict:
 
 
 def create_access_token(user: User) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     return jwt.encode(
         {"sub": str(user.id), "email": user.email, "role": user.role, "exp": expire},
         _secret_key(),
@@ -81,7 +75,7 @@ def create_access_token(user: User) -> str:
 
 def create_pre_auth_token(user_id: str) -> str:
     """Short-lived token issued after password verification when TOTP is required."""
-    expire = datetime.now(timezone.utc) + timedelta(minutes=5)
+    expire = datetime.now(UTC) + timedelta(minutes=5)
     return jwt.encode(
         {"sub": user_id, "stage": "pre_2fa", "exp": expire},
         _secret_key(),
@@ -97,19 +91,30 @@ def _issue_refresh_token(
 ) -> tuple[str, RefreshToken]:
     raw       = secrets.token_urlsafe(32)
     fid       = family_id if family_id else uuid_lib.uuid4()
-    expires   = datetime.now(timezone.utc) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    expires   = datetime.now(UTC) + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     record    = RefreshToken(
         user_id    = user.id,
         token_hash = _hash_token(raw),
         family_id  = fid,
         expires_at = expires,
-        ip_address = _extract_ip(request),
+        ip_address = client_ip(request),
         user_agent = request.headers.get("user-agent"),
     )
     db.add(record)
     db.commit()
     db.refresh(record)
     return raw, record
+
+
+def issue_session(db: Session, user: User, request: Request) -> dict:
+    """Access + refresh tokens for a completed sign-in (password, 2FA, or guest)."""
+    refresh_raw, _ = _issue_refresh_token(db, user, request)
+    return {
+        "access_token":  create_access_token(user),
+        "refresh_token": refresh_raw,
+        "token_type":    "bearer",
+        "user":          _user_dict(user),
+    }
 
 
 def get_current_user(
@@ -128,7 +133,7 @@ def get_current_user(
             raise credentials_exc
         user_id = uuid_lib.UUID(user_id_str)
     except (JWTError, ValueError):
-        raise credentials_exc
+        raise credentials_exc from None
 
     user = db.query(User).filter(User.id == user_id, User.is_active).first()
     if not user:
@@ -192,16 +197,9 @@ def signup(req: SignupRequest, request: Request, db: Session = Depends(get_db)):
 
     _record_auth_event(db, request, "signup", email, user)
 
-    from audit import log_action
     log_action(db, "user.signup", request, user=user, resource_type="user", resource_id=str(user.id))
 
-    access_token, (refresh_raw, _) = create_access_token(user), _issue_refresh_token(db, user, request)
-    return {
-        "access_token":  access_token,
-        "refresh_token": refresh_raw,
-        "token_type":    "bearer",
-        "user":          _user_dict(user),
-    }
+    return issue_session(db, user, request)
 
 
 @router.post("/login")
@@ -210,7 +208,7 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
     email = _normalize_email(req.email)
     user  = db.query(User).filter(User.email == email, User.is_active).first()
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     # Check lockout before password verification
     if user and user.locked_until and user.locked_until > now:
@@ -235,7 +233,6 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
             if failure_count >= MAX_LOGIN_ATTEMPTS:
                 user.locked_until = now + timedelta(minutes=LOCKOUT_MINUTES)
                 db.commit()
-                from audit import log_action
                 log_action(db, "user.locked", request, user=user, resource_type="user", resource_id=str(user.id))
 
         raise HTTPException(
@@ -252,7 +249,6 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
 
     _record_auth_event(db, request, "login_success", email, user)
 
-    from audit import log_action
     log_action(db, "user.login", request, user=user, resource_type="user", resource_id=str(user.id))
 
     if user.totp_enabled:
@@ -261,15 +257,7 @@ def login(req: LoginRequest, request: Request, db: Session = Depends(get_db)):
             "temp_token":   create_pre_auth_token(str(user.id)),
         }
 
-    access_token      = create_access_token(user)
-    refresh_raw, _    = _issue_refresh_token(db, user, request)
-
-    return {
-        "access_token":  access_token,
-        "refresh_token": refresh_raw,
-        "token_type":    "bearer",
-        "user":          _user_dict(user),
-    }
+    return issue_session(db, user, request)
 
 
 @router.post("/guest")
@@ -280,20 +268,12 @@ def guest_login(request: Request, db: Session = Depends(get_db)):
         user = get_or_create_guest(db)
     except GuestAccountError:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                            detail="Demo access is unavailable")
+                            detail="Demo access is unavailable") from None
 
     _record_auth_event(db, request, "guest_login", user.email, user)
-    from audit import log_action
     log_action(db, "user.guest_login", request, user=user, resource_type="user", resource_id=str(user.id))
 
-    access_token   = create_access_token(user)
-    refresh_raw, _ = _issue_refresh_token(db, user, request)
-    return {
-        "access_token":  access_token,
-        "refresh_token": refresh_raw,
-        "token_type":    "bearer",
-        "user":          _user_dict(user),
-    }
+    return issue_session(db, user, request)
 
 
 @router.post("/refresh")
@@ -304,7 +284,7 @@ def refresh_token(req: RefreshRequest, request: Request, db: Session = Depends(g
     if not record:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if record.is_revoked:
         # Token reuse — entire family is compromised; revoke all siblings
@@ -348,7 +328,7 @@ def logout(
     """Revoke this device's session chain (the refresh token's family). Without
     a refresh token, revoke all of the user's sessions, except for the shared
     guest, where that would sign out every other visitor."""
-    now   = datetime.now(timezone.utc)
+    now   = datetime.now(UTC)
     query = db.query(RefreshToken).filter(
         RefreshToken.user_id == current_user.id,
         ~RefreshToken.is_revoked,
@@ -374,7 +354,7 @@ def list_sessions(
     current_user: User = Depends(require_account_manage),
     db: Session = Depends(get_db),
 ):
-    now     = datetime.now(timezone.utc)
+    now     = datetime.now(UTC)
     records = (
         db.query(RefreshToken)
         .filter(
@@ -408,7 +388,7 @@ def revoke_session(
     try:
         sid = uuid_lib.UUID(session_id)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid session ID")
+        raise HTTPException(status_code=400, detail="Invalid session ID") from None
 
     record = db.query(RefreshToken).filter(
         RefreshToken.id      == sid,
@@ -419,7 +399,7 @@ def revoke_session(
         raise HTTPException(status_code=404, detail="Session not found")
 
     record.is_revoked = True
-    record.revoked_at = datetime.now(timezone.utc)
+    record.revoked_at = datetime.now(UTC)
     db.commit()
     return {"message": "Session revoked"}
 

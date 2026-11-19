@@ -1,4 +1,23 @@
 # Pin the rule set so a Ruff upgrade can't change what CI enforces.
-# Ruff 0.16 expanded its defaults roughly 7x; these are the pre-0.16 defaults.
+# Ruff 0.16 expanded its defaults roughly 7x, so this lists rules explicitly.
 [lint]
-select = ["E4", "E7", "E9", "F"]
+select = [
+    "E4", "E7", "E9", "F",  # pre-0.16 defaults
+    "W",                    # whitespace
+    "I",                    # import order
+    "UP",                   # modern syntax for the Python version in use
+    "B",                    # likely bugs
+    "SIM",                  # simplifications
+    "RET",                  # return statements
+]
+ignore = [
+    "B008",  # Depends()/Query() in argument defaults is how FastAPI works
+]
+
+[lint.per-file-ignores]
+# Alembic generates these; keep them as generated.
+"alembic/versions/*" = ["I", "UP", "W"]
+
+[lint.isort]
+# backend/alembic/ is the migrations folder, not the alembic package.
+known-third-party = ["alembic"]

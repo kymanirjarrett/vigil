@@ -13,9 +13,9 @@ The story the anomaly engine finds:
 """
 import hashlib
 import random
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
-from typing import Callable
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -89,7 +89,7 @@ def _run_id(job: str, index: int) -> str:
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class SeedDataProvider(DataProvider):

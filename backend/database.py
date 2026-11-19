@@ -1,8 +1,9 @@
+import os
+
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.engine import make_url
-from sqlalchemy.orm import sessionmaker, DeclarativeBase
-import os
-from dotenv import load_dotenv
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 load_dotenv()
 

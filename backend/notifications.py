@@ -64,7 +64,7 @@ class SendGridAlertSender:
             </tr>
             """
 
-        html_body = f"""
+        return f"""
         <!DOCTYPE html>
         <html>
         <body style="margin:0;padding:0;background:#0a0b0d;font-family:'Courier New',monospace;">
@@ -111,7 +111,7 @@ class SendGridAlertSender:
             <!-- Footer -->
             <div style="padding:16px 28px;border-top:1px solid #1e2028;">
               <p style="font-size:11px;color:#5a5f72;margin:0;">
-                Sent by Vigil · AWS Region: us-east-2 · 
+                Sent by Vigil · AWS Region: us-east-2 ·
                 <a href="{dashboard_url}" style="color:#00e5a0;text-decoration:none;">Open Dashboard</a>
               </p>
             </div>
@@ -120,7 +120,6 @@ class SendGridAlertSender:
         </body>
         </html>
         """
-        return html_body
 
 
 @lru_cache(maxsize=1)

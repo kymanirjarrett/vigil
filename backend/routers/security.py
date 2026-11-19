@@ -1,15 +1,15 @@
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session
 
-from auth_detection import detect_auth_anomalies
+from auth_detection import detect_auth_anomalies, event_dicts
 from database import get_db
-from security_seed import get_seed_security_posture
 from models import AuditLogEntry, AuthEvent, User
 from permissions import SecurityViewer, require_security_view
+from security_seed import get_seed_security_posture
 
 router = APIRouter()
 
@@ -22,7 +22,7 @@ def get_security_posture(
     if viewer.sample:
         return get_seed_security_posture()
 
-    now       = datetime.now(timezone.utc)
+    now       = datetime.now(UTC)
     since_24h = now - timedelta(hours=24)
     since_7d  = now - timedelta(days=7)
 
@@ -65,12 +65,7 @@ def get_security_posture(
     top_ips = [{"ip": r.ip_address, "failure_count": r.cnt} for r in top_ip_rows]
 
     # ── Auth anomaly summary (reuse detection engine on 24h data) ───────────
-    event_dicts = [
-        {"email": e.email, "event_type": e.event_type,
-         "ip_address": e.ip_address, "created_at": e.created_at}
-        for e in events_24h
-    ]
-    anomalies = detect_auth_anomalies(event_dicts)
+    anomalies = detect_auth_anomalies(event_dicts(events_24h))
     anomaly_summary = {
         "total":    len(anomalies),
         "critical": sum(1 for a in anomalies if a["severity"] == "critical"),

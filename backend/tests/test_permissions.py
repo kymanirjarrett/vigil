@@ -1,9 +1,9 @@
 import uuid
 
 import pytest
+from conftest import auth_header
 
 import permissions
-from conftest import auth_header
 from permissions import has_permission
 
 ALERT = {"job_name": "customer-data-pipeline", "recipient_email": "oncall@example.com"}

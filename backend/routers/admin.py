@@ -1,6 +1,5 @@
 import uuid as uuid_lib
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -17,8 +16,8 @@ VALID_ROLES = {"admin", "analyst"}
 
 
 class UserUpdateRequest(BaseModel):
-    role:      Optional[str]  = None
-    is_active: Optional[bool] = None
+    role:      str | None  = None
+    is_active: bool | None = None
 
 
 @router.post("/users/{user_id}/unlock")
@@ -31,7 +30,7 @@ def unlock_user(
     try:
         uid = uuid_lib.UUID(user_id)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID")
+        raise HTTPException(status_code=400, detail="Invalid user ID") from None
 
     target = db.query(User).filter(User.id == uid).first()
     if not target:
@@ -64,13 +63,13 @@ def revoke_user_sessions(
     try:
         uid = uuid_lib.UUID(user_id)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID")
+        raise HTTPException(status_code=400, detail="Invalid user ID") from None
 
     target = db.query(User).filter(User.id == uid).first()
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     db.query(RefreshToken).filter(
         RefreshToken.user_id    == uid,
         ~RefreshToken.is_revoked,
@@ -98,7 +97,7 @@ def update_user(
     try:
         uid = uuid_lib.UUID(user_id)
     except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID")
+        raise HTTPException(status_code=400, detail="Invalid user ID") from None
 
     if uid == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot modify your own account")
