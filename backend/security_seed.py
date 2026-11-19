@@ -13,7 +13,7 @@ One story runs through all four security pages:
 import random
 import uuid
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from auth_detection import detect_auth_anomalies
 
@@ -40,7 +40,7 @@ def mask_ip(ip: str | None) -> str | None:
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _id(*parts) -> str:
@@ -65,7 +65,7 @@ def _auth_events(now: datetime) -> list[dict]:
     for i in range(7):
         add(14 + i * 0.9, BRUTE_TARGET, "login_failure", BRUTE_IP, UA_SCRIPT)
     # A normal day: sign-ins spread over 24 hours, a few typos.
-    for i in range(40):
+    for _ in range(40):
         minutes = rng.uniform(25, 24 * 60)
         email = rng.choice(TEAM)
         kind = "login_failure" if rng.random() < 0.1 else "login_success"

@@ -1,7 +1,8 @@
 """Refresh-token rotation and reuse detection, and account lockout."""
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from conftest import PASSWORD
+
 from models import RefreshToken
 
 LOGIN   = "/api/v1/auth/login"
@@ -58,7 +59,7 @@ def test_reuse_revocation_is_scoped_to_one_session_chain(client, make_user, db):
 def test_expired_refresh_token_is_rejected(client, make_user, db):
     user = make_user()
     raw = login(client, user.email).json()["refresh_token"]
-    db.query(RefreshToken).update({"expires_at": datetime.now(timezone.utc) - timedelta(seconds=1)})
+    db.query(RefreshToken).update({"expires_at": datetime.now(UTC) - timedelta(seconds=1)})
     db.commit()
     assert refresh(client, raw).status_code == 401
 
@@ -73,10 +74,10 @@ def test_locks_after_threshold_then_unlocks_after_cooldown(client, make_user, db
     # Locked: even the right password is refused.
     assert login(client, user.email).status_code == 429
     db.refresh(user)
-    assert user.locked_until > datetime.now(timezone.utc)
+    assert user.locked_until > datetime.now(UTC)
 
     # Cooldown passes.
-    user.locked_until = datetime.now(timezone.utc) - timedelta(seconds=1)
+    user.locked_until = datetime.now(UTC) - timedelta(seconds=1)
     db.commit()
     assert login(client, user.email).status_code == 200
     db.refresh(user)

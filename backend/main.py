@@ -1,17 +1,28 @@
 import os
-from fastapi import FastAPI, Depends, Request
-from fastapi.responses import JSONResponse
+
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
+from fastapi.responses import JSONResponse
+from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+
 import settings  # noqa: F401  (validates DATA_SOURCE at startup)
 from data_sources import DataSourceError, JobNotFoundError
-from routers import glue, anomalies, alerts, history, auth, audit, auth_events, auth_anomalies, admin, security, totp, health
-from routers.auth import get_current_user
-
-limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
-
+from routers import (
+    admin,
+    alerts,
+    anomalies,
+    audit,
+    auth,
+    auth_anomalies,
+    auth_events,
+    glue,
+    health,
+    history,
+    security,
+    totp,
+)
+from routers.auth import get_current_user, limiter
 
 # Schema is owned by Alembic and applied by start.sh before the server boots.
 # Do not call Base.metadata.create_all() here: it creates tables without RLS,
@@ -22,6 +33,8 @@ app = FastAPI(
     description="ETL Monitoring & Observability Platform",
     version="1.0.0",
 )
+# One limiter for the whole app. Limits are per route (@limiter.limit in
+# routers/auth.py); there is no global default.
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 

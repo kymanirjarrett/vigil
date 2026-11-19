@@ -1,7 +1,9 @@
+import uuid
+
 from fastapi import Request
 from sqlalchemy.orm import Session
+
 from models import AuditLogEntry, User
-import uuid
 
 
 def log_action(
@@ -14,7 +16,7 @@ def log_action(
     metadata: dict = None,
 ) -> None:
     """Append an immutable audit record. Never update or delete rows from audit_log."""
-    ip = _extract_ip(request)
+    ip = client_ip(request)
     ua = request.headers.get("user-agent")
 
     entry = AuditLogEntry(
@@ -31,7 +33,7 @@ def log_action(
     db.commit()
 
 
-def _extract_ip(request: Request) -> str:
+def client_ip(request: Request) -> str | None:
     # Render (and most proxies) set X-Forwarded-For; fall back to direct client IP.
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:

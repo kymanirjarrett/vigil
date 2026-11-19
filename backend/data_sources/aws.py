@@ -23,8 +23,8 @@ def _map_run(run: dict) -> dict:
         "started_on":     str(run.get("StartedOn", "")),
         "completed_on":   str(run.get("CompletedOn", "")),
         "execution_time": run.get("ExecutionTime", 0),
-        "error_message":  run.get("ErrorMessage", None),
-        "dpu_seconds":    run.get("DPUSeconds", None),
+        "error_message":  run.get("ErrorMessage"),
+        "dpu_seconds":    run.get("DPUSeconds"),
     }
 
 

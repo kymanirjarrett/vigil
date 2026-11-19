@@ -8,7 +8,8 @@ from database import get_db
 router = APIRouter()
 
 
-def _scan(provider: DataProvider, job_name: str) -> tuple[list, list]:
+def scan_job(provider: DataProvider, job_name: str) -> tuple[list, list]:
+    """Fetch a job's recent runs and run the anomaly rules over them."""
     runs = provider.get_runs(job_name, max_results=50)
     anomalies = detect_anomalies(runs)
     for a in anomalies:
@@ -18,7 +19,7 @@ def _scan(provider: DataProvider, job_name: str) -> tuple[list, list]:
 
 @router.get("/jobs/{job_name}/anomalies")
 def get_job_anomalies(job_name: str, provider: DataProvider = Depends(get_data_provider)):
-    runs, anomalies = _scan(provider, job_name)
+    runs, anomalies = scan_job(provider, job_name)
     return {
         "job_name":      job_name,
         "runs_analyzed": len(runs),
@@ -36,7 +37,7 @@ def get_all_anomalies(
     jobs = provider.list_jobs()
     all_anomalies = []
     for job in jobs:
-        all_anomalies.extend(_scan(provider, job["name"])[1])
+        all_anomalies.extend(scan_job(provider, job["name"])[1])
     provider.record_anomalies(db, all_anomalies)
     return {
         "jobs_scanned":  len(jobs),

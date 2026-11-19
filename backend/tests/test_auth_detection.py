@@ -1,9 +1,9 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from auth_detection import detect_brute_force, detect_credential_stuffing
 from models import AuthEvent
 
-NOW = datetime(2026, 11, 18, 12, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 11, 18, 12, 0, tzinfo=UTC)
 
 
 def failure(email, ip="198.51.100.1", minutes_ago=0.0):

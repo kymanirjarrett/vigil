@@ -9,7 +9,9 @@ Requires:
   VIGIL_PASSWORD_HASH   - existing bcrypt hash (legacy, takes precedence)
 """
 import os
+
 from dotenv import load_dotenv
+
 from database import SessionLocal
 from models import User
 from passwords import hash_password

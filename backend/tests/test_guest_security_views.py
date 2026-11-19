@@ -2,8 +2,8 @@
 import re
 
 import pytest
-
 from conftest import PASSWORD, auth_header
+
 from security_seed import mask_ip
 
 SECURITY_VIEWS = [
