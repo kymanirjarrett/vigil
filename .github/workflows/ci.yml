@@ -28,6 +28,62 @@ jobs:
           find backend -name "*.py" -not -path "*/venv/*" \
             -exec python -m py_compile {} \;
 
+  backend-tests:
+    name: Backend — tests
+    runs-on: ubuntu-latest
+    # A throwaway Postgres matching production's major version. Tests never
+    # touch Supabase: conftest.py refuses any non-local database host.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:test@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements-dev.txt
+
+      - name: Run pytest with coverage
+        working-directory: backend
+        run: python -m pytest --cov --cov-report=term-missing
+
+      - name: Coverage summary
+        if: always()
+        working-directory: backend
+        run: coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+
+  frontend-tests:
+    name: Frontend — tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"  # matches Vercel
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: cd frontend && npm ci
+
+      - name: Run Vitest with coverage
+        run: |
+          cd frontend
+          npm run test:coverage | tee vitest.log
+          { echo '### Frontend coverage'; echo '```'; sed -n '/% Stmts/,$p' vitest.log; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
   frontend:
     name: Frontend — lint, build & audit
     runs-on: ubuntu-latest
@@ -36,7 +92,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"  # matches Vercel
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
