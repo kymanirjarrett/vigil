@@ -1,0 +1,101 @@
+{
+  "/api/v1/glue/jobs": {
+    "count": 4,
+    "jobs": [
+      {
+        "name": "customer-data-pipeline",
+        "created_on": "2026-05-23 04:38:59.378681+00:00",
+        "last_modified": "2026-11-18 04:38:59.378681+00:00",
+        "glue_version": "4.0",
+        "worker_type": "G.1X",
+        "max_capacity": 10,
+        "timeout": 2880
+      },
+      {
+        "name": "revenue-aggregation",
+        "created_on": "2025-11-19 04:38:59.378681+00:00",
+        "last_modified": "2026-11-12 04:38:59.378681+00:00",
+        "glue_version": "4.0",
+        "worker_type": "G.1X",
+        "max_capacity": 5,
+        "timeout": 1440
+      },
+      {
+        "name": "ml-feature-extraction",
+        "created_on": "2026-08-21 04:38:59.378681+00:00",
+        "last_modified": "2026-11-16 04:38:59.378681+00:00",
+        "glue_version": "4.0",
+        "worker_type": "G.2X",
+        "max_capacity": 20,
+        "timeout": 2880
+      },
+      {
+        "name": "legacy-etl-migration",
+        "created_on": "2024-11-19 04:38:59.378681+00:00",
+        "last_modified": "2026-11-05 04:38:59.378681+00:00",
+        "glue_version": "3.0",
+        "worker_type": "Standard",
+        "max_capacity": 5,
+        "timeout": 4320
+      }
+    ],
+    "source": "seed"
+  },
+  "/api/v1/anomalies/summary": {
+    "jobs_scanned": 4,
+    "anomaly_count": 2,
+    "anomalies": [
+      {
+        "run_id": "jr_88ce9e102896712af4005232399b6f7de44cdaf6fdf7f6238317a48679c1c29b",
+        "type": "CONSECUTIVE_FAILURES",
+        "severity": "critical",
+        "message": "2 consecutive failed runs detected.",
+        "started_on": "2026-11-18 04:25:00+00:00",
+        "job_name": "customer-data-pipeline"
+      },
+      {
+        "run_id": "jr_597090789fbf73e73201e8cbf329ee4528aedb3daffa0c918e49731946b75ca9",
+        "type": "DURATION_SPIKE",
+        "severity": "warning",
+        "message": "Run took 5200s, 4.2\u03c3 above average (985s)",
+        "started_on": "2026-11-18 04:25:00+00:00",
+        "job_name": "ml-feature-extraction"
+      }
+    ],
+    "source": "seed"
+  },
+  "/api/v1/history/anomalies": {
+    "count": 2,
+    "anomalies": [
+      {
+        "job_name": "ml-feature-extraction",
+        "run_id": "jr_597090789fbf73e73201e8cbf329ee4528aedb3daffa0c918e49731946b75ca9",
+        "type": "DURATION_SPIKE",
+        "severity": "warning",
+        "message": "Run took 5200s, 4.2\u03c3 above average (985s)",
+        "detected_at": "2026-11-18T05:51:40+00:00",
+        "id": 1
+      },
+      {
+        "job_name": "customer-data-pipeline",
+        "run_id": "jr_88ce9e102896712af4005232399b6f7de44cdaf6fdf7f6238317a48679c1c29b",
+        "type": "CONSECUTIVE_FAILURES",
+        "severity": "critical",
+        "message": "2 consecutive failed runs detected.",
+        "detected_at": "2026-11-18T04:26:10+00:00",
+        "id": 2
+      }
+    ],
+    "source": "seed"
+  },
+  "/api/v1/history/alerts": {
+    "count": 0,
+    "alerts": []
+  },
+  "/health": {
+    "status": "ok",
+    "service": "Vigil API",
+    "version": "1.0.0",
+    "data_source": "seed"
+  }
+}
