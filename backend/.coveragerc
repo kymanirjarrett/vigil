@@ -1,0 +1,7 @@
+[run]
+source = .
+omit =
+    tests/*
+    venv/*
+    alembic/*
+    seed_admin.py
