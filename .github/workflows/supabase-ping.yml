@@ -1,13 +1,13 @@
-name: Supabase Keep-Alive Ping
+name: Supabase Keep-Alive Ping (manual)
 
-# Supabase free-tier projects pause after 7 days of inactivity.
-# This workflow hits /health/deep every 3 days to keep the DB awake.
-# /health/deep runs a real SELECT 1 — a plain /health that doesn't touch
+# Manual fallback only. The scheduled keep-alive runs on cron-job.org, which
+# calls /health/deep every 3 days. It moved off GitHub Actions because GitHub
+# disables scheduled workflows in public repos after 60 days without repository
+# activity, which would let Supabase pause silently once the repo goes quiet.
+# /health/deep runs a real SELECT 1; a plain /health that doesn't touch
 # Postgres would NOT reset Supabase's inactivity timer.
 
 on:
-  schedule:
-    - cron: "0 12 */3 * *"  # every 3 days at noon UTC
   workflow_dispatch:
 
 jobs:
