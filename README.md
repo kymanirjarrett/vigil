@@ -8,9 +8,11 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.139-009688)
 ![React](https://img.shields.io/badge/React-19-61DAFB)
 
-**Live demo:** [vigil-three-amber.vercel.app](https://vigil-three-amber.vercel.app/) · **API docs:** [vigil-59y0.onrender.com/docs](https://vigil-59y0.onrender.com/docs)
+**Live demo:** [vigil-etl.vercel.app](https://vigil-etl.vercel.app/) · **API docs:** [vigil-59y0.onrender.com/docs](https://vigil-59y0.onrender.com/docs)
 
-> Sign up to explore as an Analyst in demo mode. The API runs on Render's free tier and sleeps when idle, so the first request after a cold start can take about 30 seconds.
+> Click **Try the demo** to sign in as a shared read-only guest. The app runs on sample pipeline data. The API runs on Render's free tier and sleeps when idle, so the first request after a while can take about a minute while it wakes up.
+
+Feature-complete portfolio project, not accepting contributions. Fork freely under the MIT license.
 
 ---
 
@@ -21,11 +23,12 @@ AWS Glue jobs fail quietly. Usually the first sign is a downstream user noticing
 ## Features
 
 **Monitoring**
-- Live dashboard of every Glue job in the account, with latest status and worker configuration
+- Sample pipeline data by default (`DATA_SOURCE=seed`), so the app is fully explorable without AWS access
+- With `DATA_SOURCE=aws`, a live dashboard of every Glue job in the account, with latest status and worker configuration
 - Per-job run history with duration charts and status badges
 - Anomaly detection that flags duration spikes (more than 2 standard deviations above the job's mean run time) and consecutive failure streaks
-- One-click anomaly scans with SendGrid email alerts, with every anomaly and alert stored for history
-- Demo mode with realistic sample data, so the app is explorable without AWS access
+- One-click anomaly scans, with every anomaly and alert stored for history. Alerts are simulated on sample data and sent by SendGrid email with `DATA_SOURCE=aws`
+- A shared read-only guest account ("Try the demo") that sees synthetic security data with masked IP addresses
 
 **Security model**
 - **Role-based access control.** Admin and Analyst roles map to granular permissions (`jobs:read`, `alerts:trigger`, `users:manage`, `audit:read`, and more), stored in the database and enforced server-side on every route. Analysts get read-only access by default.
@@ -42,7 +45,7 @@ AWS Glue jobs fail quietly. Usually the first sign is a downstream user noticing
 flowchart LR
     U[Browser] -->|HTTPS + JWT| FE[React + Vite<br/>Vercel]
     FE -->|REST| API[FastAPI<br/>Render, Docker]
-    API -->|boto3, read-only IAM| AWS[AWS Glue, Athena, S3]
+    API -->|boto3, read-only IAM<br/>DATA_SOURCE=aws| AWS[AWS Glue, Athena, S3]
     API -->|SQLAlchemy| DB[(PostgreSQL<br/>Supabase, RLS on every table)]
     API -->|alerts| SG[SendGrid]
     CF[CloudFormation<br/>infra/vigil-stack.yaml] -.provisions.-> AWS
@@ -58,7 +61,7 @@ The ping used to be a scheduled GitHub Actions workflow. GitHub disables schedul
 
 ### Infrastructure as code
 
-[`infra/vigil-stack.yaml`](infra/vigil-stack.yaml) provisions a real pipeline for Vigil to monitor: S3 buckets for input, output, scripts, and Athena results, a Glue database, table, job, and crawler, a Glue service role, and a read-only IAM policy for the backend. It deploys through a manual GitHub Actions workflow per environment, and `prod` requires an approval from a repository admin. See [`infra/README.md`](infra/README.md).
+[`infra/vigil-stack.yaml`](infra/vigil-stack.yaml) provisions a real pipeline for Vigil to monitor: S3 buckets for input, output, scripts, and Athena results, a Glue database, table, job, and crawler, a Glue service role, and a read-only IAM policy for the backend. It deploys through a manual GitHub Actions workflow per environment, and `prod` requires an approval from a repository admin. The stack is not currently deployed; the live app runs on sample data. See [`infra/README.md`](infra/README.md).
 
 ## Tech stack
 
@@ -75,7 +78,7 @@ The ping used to be a scheduled GitHub Actions workflow. GitHub disables schedul
 
 ## Engineering practices
 
-- **CI on every push and pull request:** Ruff and a compile check on the backend; ESLint, a production build, and `npm audit` (fails on high severity) on the frontend; pytest and Vitest suites with coverage in the job summary.
+- **CI on every pull request and on `main`:** Ruff and a compile check on the backend; ESLint, a production build, and `npm audit` (fails on high severity) on the frontend; pytest and Vitest suites with coverage in the job summary.
 - **Tests against real Postgres:** the backend suite applies the actual Alembic migrations to a disposable Postgres 17 (a service container in CI), so RLS and constraints behave as in production. It refuses to run against any non-local database host.
 - **Secret scanning before every commit:** a Husky pre-commit hook runs secretlint on staged files, and a pre-push hook lints both apps.
 - **Migrations only:** every schema change is an Alembic migration, and RLS ships in the same migration as the table.
@@ -113,12 +116,13 @@ cd frontend && npm test
 
 | Variable | Purpose |
 |---|---|
+| `DATA_SOURCE` | `seed` (default, sample data) or `aws` (live Glue, Athena, and S3) |
 | `DATABASE_URL` | PostgreSQL connection string (Supabase session mode) |
 | `VIGIL_JWT_SECRET` | Secret for signing JWTs (`openssl rand -hex 32`) |
 | `VIGIL_ADMIN_EMAIL`, `VIGIL_ADMIN_PASSWORD` | Seeds the first Admin account |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` | Read-only IAM user for Glue, Athena, and S3 |
-| `GLUE_DATABASE_NAME`, `GLUE_TABLE_NAME`, `ATHENA_RESULTS_BUCKET` | Resources created by the CloudFormation stack |
-| `SENDGRID_API_KEY`, `ALERT_SENDER_EMAIL` | Alert email delivery |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION` | Read-only IAM user for Glue, Athena, and S3. Only with `DATA_SOURCE=aws` |
+| `GLUE_DATABASE_NAME`, `GLUE_TABLE_NAME`, `ATHENA_RESULTS_BUCKET` | Resources created by the CloudFormation stack. Only with `DATA_SOURCE=aws` |
+| `SENDGRID_API_KEY`, `ALERT_SENDER_EMAIL` | Alert email delivery. Only with `DATA_SOURCE=aws` |
 | `ALLOWED_ORIGINS` | Comma-separated CORS origins |
 
 ## Project structure
@@ -127,25 +131,25 @@ cd frontend && npm test
 vigil/
 ├── backend/
 │   ├── routers/          auth, totp, admin, glue, anomalies, alerts, history,
-│   │                     audit, auth_events, auth_anomalies, security, mode, health
+│   │                     audit, auth_events, auth_anomalies, security, health
+│   ├── data_sources/     pipeline data providers: seed (sample data) and aws
 │   ├── alembic/          migrations (RLS enabled per table)
+│   ├── tests/            pytest suite, run against a disposable Postgres
 │   ├── permissions.py    RBAC: role to permission mapping and require_permission
 │   ├── audit.py          append-only audit logging
 │   ├── auth_detection.py brute force and credential stuffing detection
+│   ├── guest.py          shared read-only guest account
+│   ├── security_seed.py  synthetic security data for the guest
+│   ├── settings.py       environment settings, including DATA_SOURCE
+│   ├── start.sh          container entrypoint
 │   └── main.py
-├── frontend/src/components/   dashboard, admin, audit, security, and account pages
+├── frontend/src/
+│   ├── api.js            shared API base URL
+│   └── components/       dashboard, admin, audit, security, and account pages
 ├── infra/                     CloudFormation stack, Glue script, seed data
 ├── .github/workflows/         CI, CloudFormation deploy, manual keep-alive fallback
 └── .husky/                    pre-commit secret scan, pre-push lint
 ```
-
-## Roadmap
-
-- Backend and frontend test suites, run in CI
-- Keyless AWS authentication for the deploy workflow through GitHub OIDC
-- CloudWatch metrics for Lambda and Glue
-- Slack alerting and per-job anomaly sensitivity
-- Step Functions monitoring
 
 ## License
 
