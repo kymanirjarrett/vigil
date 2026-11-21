@@ -2,6 +2,8 @@
 
 CloudFormation template that provisions all AWS resources for the Vigil ETL monitoring platform.
 
+> **Status:** this stack is not deployed. The live app runs on seeded sample data (`DATA_SOURCE=seed`), and the template is kept as an infrastructure-as-code reference. Running the deploy workflow requires adding AWS credentials with CloudFormation and IAM permissions as repository secrets.
+
 ## What the stack provisions
 
 | Resource | Name pattern | Purpose |
